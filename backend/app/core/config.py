@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
     max_import_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
     admin_emails: str = ""
+    crawler_enabled: bool = True
+    crawler_tick_seconds: int = Field(default=60, ge=15, le=3600)
+    crawler_timeout_seconds: int = Field(default=10, ge=2, le=60)
+    crawler_max_response_bytes: int = Field(default=2 * 1024 * 1024, ge=1024)
+    crawler_max_items_per_run: int = Field(default=100, ge=1, le=500)
+    crawler_user_agent: str = "OfferPilotAI/0.4 (local official-source sync)"
 
     @property
     def cors_origin_list(self) -> list[str]:

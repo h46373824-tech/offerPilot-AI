@@ -4,7 +4,7 @@
 
 OfferPilot AI 使用 PostgreSQL 作为业务事实来源，SQLAlchemy 2 负责 ORM 映射，Alembic 负责 schema 版本管理。Redis 是缓存与任务扩展设施，不保存不可恢复的核心业务事实。
 
-第三阶段包含 13 张表：原有 11 张业务表，以及 `data_sources`、`import_batches` 两张治理表。
+第四阶段包含 14 张表：原有 11 张业务表、`data_sources`、`import_batches`，以及官方来源同步运行表 `crawl_runs`。
 
 ```text
 users
@@ -20,9 +20,10 @@ job_alerts
 audit_logs
 data_sources
 import_batches
+crawl_runs
 ```
 
-迁移版本依次为 `0001`、`0002`、`0003`。多数业务表包含 `created_at` 和 `updated_at`，由数据库生成创建时间并在更新时维护修改时间。
+迁移版本依次为 `0001`、`0002`、`0003`、`0004`。多数业务表包含 `created_at` 和 `updated_at`，由数据库生成创建时间并在更新时维护修改时间。
 
 ## 2. 关系图
 
@@ -41,6 +42,8 @@ erDiagram
     JOBS ||--o{ FAVORITES : target
     APPLICATIONS ||--o{ INTERVIEWS : has
     APPLICATIONS ||--o{ OFFERS : produces
+    COMPANIES ||--o{ DATA_SOURCES : configures
+    DATA_SOURCES ||--o{ CRAWL_RUNS : records
 ```
 
 ## 3. 通用约定
@@ -295,11 +298,15 @@ erDiagram
 
 ### 4.12 `data_sources`
 
-保存授权来源名称、类型、主页、授权说明、许可信息、启停状态、创建管理员与最近导入时间。名称唯一；删除管理员不会删除来源记录。企业和岗位通过可空的 `data_source_id` 关联来源，同时保留 `data_source` 文本用于兼容和展示。
+保存授权来源名称、类型、主页、授权说明、许可信息、启停状态、创建管理员与最近导入时间。第四阶段还保存绑定企业、官方 Feed URL、解析模式、链接关键词、同步开关、间隔、最近/下次同步时间和结果状态。名称唯一；删除管理员或绑定企业不会删除来源记录。企业和岗位通过可空的 `data_source_id` 关联来源，同时保留 `data_source` 文本用于兼容和展示。
 
 ### 4.13 `import_batches`
 
 保存来源、上传管理员、实体类型、原文件名、处理状态、总行数、新增/更新/跳过/错误数量及最多 100 条错误摘要。CSV 原文件不持久化，避免在本地长期保留不必要副本；可追溯事实由批次元数据、来源和审计日志共同提供。
+
+### 4.14 `crawl_runs`
+
+记录每次官方来源同步的 `source_id`、状态、新增/更新/跳过数量、错误摘要以及开始和结束时间。来源删除后 `source_id` 置空，历史结果仍保留；响应正文不持久化，避免无授权复制和不必要的本地存储。
 
 ## 5. 删除策略
 

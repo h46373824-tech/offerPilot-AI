@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   Database,
   FileUp,
+  RefreshCw,
+  Rss,
   ShieldCheck,
   XCircle,
 } from "lucide-react";
@@ -14,6 +16,8 @@ import { apiFetch } from "@/lib/api";
 import { useHasToken } from "@/lib/auth";
 import type {
   ApiPage,
+  Company,
+  CrawlRun,
   CurrentUser,
   DataQualityStats,
   DataSource,
@@ -55,6 +59,18 @@ function GovernanceWorkspace() {
     queryKey: ["admin", "imports"],
     queryFn: () => apiFetch<ApiPage<ImportBatch>>("/admin/imports?page_size=8"),
   });
+  const companies = useQuery({
+    queryKey: ["companies", "admin-source-map"],
+    queryFn: () =>
+      apiFetch<ApiPage<Company>>(
+        "/companies?page_size=100&sort_by=name&order=asc",
+      ),
+  });
+  const crawlRuns = useQuery({
+    queryKey: ["admin", "crawl-runs"],
+    queryFn: () =>
+      apiFetch<ApiPage<CrawlRun>>("/admin/crawl-runs?page_size=10"),
+  });
   const review = useQuery({
     queryKey: ["admin", "review", entityType],
     queryFn: () =>
@@ -93,6 +109,21 @@ function GovernanceWorkspace() {
       refresh();
     },
   });
+  const crawl = useMutation({
+    mutationFn: (sourceId: number) =>
+      apiFetch<CrawlRun>(`/admin/data-sources/${sourceId}/crawl`, {
+        method: "POST",
+      }),
+    onError: (error) => setMessage((error as Error).message),
+    onSuccess: (run) => {
+      setMessage(
+        run.status === "completed"
+          ? `同步完成：新增 ${run.discovered_rows}，更新 ${run.updated_rows}，跳过 ${run.skipped_rows}`
+          : `同步失败：${run.error_message ?? "请检查来源配置"}`,
+      );
+      refresh();
+    },
+  });
   const decide = useMutation({
     mutationFn: ({
       action,
@@ -110,9 +141,22 @@ function GovernanceWorkspace() {
     onSuccess: refresh,
   });
 
-  if (sources.isPending || quality.isPending || imports.isPending)
+  if (
+    sources.isPending ||
+    quality.isPending ||
+    imports.isPending ||
+    companies.isPending ||
+    crawlRuns.isPending
+  )
     return <LoadingState text="正在加载本地数据治理信息…" />;
-  if (sources.isError || quality.isError || imports.isError || !quality.data)
+  if (
+    sources.isError ||
+    quality.isError ||
+    imports.isError ||
+    companies.isError ||
+    crawlRuns.isError ||
+    !quality.data
+  )
     return <ErrorState text="数据治理信息加载失败。" />;
 
   return (
@@ -149,9 +193,16 @@ function GovernanceWorkspace() {
         />
         <ImportPanel mutation={upload} sources={sources.data?.items ?? []} />
       </div>
+      <OfficialSyncPanel
+        companies={companies.data?.items ?? []}
+        crawlMutation={crawl}
+        createMutation={createSource}
+        runs={crawlRuns.data?.items ?? []}
+        sources={sources.data?.items ?? []}
+      />
       {message && (
         <p
-          className={`rounded-xl px-4 py-3 text-sm ${createSource.isError || upload.isError ? "bg-rose-50 text-rose-700 dark:bg-rose-950" : "bg-teal-50 text-teal-700 dark:bg-teal-950"}`}
+          className={`rounded-xl px-4 py-3 text-sm ${createSource.isError || upload.isError || crawl.isError ? "bg-rose-50 text-rose-700 dark:bg-rose-950" : "bg-teal-50 text-teal-700 dark:bg-teal-950"}`}
         >
           {message}
         </p>
@@ -320,6 +371,214 @@ function SourcePanel({
             {source.name} · {source.is_active ? "启用" : "停用"}
           </span>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function OfficialSyncPanel({
+  companies,
+  crawlMutation,
+  createMutation,
+  runs,
+  sources,
+}: {
+  companies: Company[];
+  crawlMutation: ReturnType<typeof useMutation<CrawlRun, Error, number>>;
+  createMutation: ReturnType<typeof useMutation<DataSource, Error, object>>;
+  runs: CrawlRun[];
+  sources: DataSource[];
+}) {
+  const sourceNames = new Map(
+    sources.map((source) => [source.id, source.name]),
+  );
+  const crawlerSources = sources.filter((source) => source.feed_url);
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-[var(--border)] p-5">
+        <div className="flex items-start gap-3">
+          <span className="rounded-xl bg-teal-50 p-3 text-teal-600 dark:bg-teal-950">
+            <Rss aria-hidden="true" size={22} />
+          </span>
+          <div>
+            <h2 className="font-bold">企业官方招聘自动同步</h2>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+              仅配置已确认可自动访问的企业官方页面、RSS、Atom 或 JSON
+              Feed。系统遵守
+              robots.txt，不登录、不绕过验证码；新岗位先进入待核验队列。
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            const keywords = String(data.get("link_keywords") ?? "")
+              .split(/[，,]/)
+              .map((item) => item.trim())
+              .filter(Boolean);
+            createMutation.mutate({
+              name: data.get("name"),
+              source_type: "official_recruitment",
+              base_url: data.get("feed_url"),
+              authorization_note: data.get("authorization_note"),
+              company_id: Number(data.get("company_id")),
+              feed_url: data.get("feed_url"),
+              parser_mode: data.get("parser_mode"),
+              link_keywords: keywords,
+              is_crawl_enabled: true,
+              crawl_interval_minutes: Number(
+                data.get("crawl_interval_minutes"),
+              ),
+            });
+            event.currentTarget.reset();
+          }}
+        >
+          <h3 className="text-sm font-bold">新增官方来源</h3>
+          <input
+            className="field"
+            name="name"
+            placeholder="来源名称"
+            required
+          />
+          <select className="field" defaultValue="" name="company_id" required>
+            <option disabled value="">
+              绑定企业
+            </option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+          <input
+            className="field"
+            name="feed_url"
+            placeholder="https://企业官方招聘页或 Feed"
+            required
+            type="url"
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <select className="field" defaultValue="auto" name="parser_mode">
+              <option value="auto">自动识别格式</option>
+              <option value="html_links">HTML 招聘链接</option>
+              <option value="rss">RSS</option>
+              <option value="atom">Atom</option>
+              <option value="json_feed">JSON Feed</option>
+            </select>
+            <select
+              className="field"
+              defaultValue="360"
+              name="crawl_interval_minutes"
+            >
+              <option value="60">每小时</option>
+              <option value="360">每 6 小时</option>
+              <option value="720">每 12 小时</option>
+              <option value="1440">每天</option>
+            </select>
+          </div>
+          <input
+            className="field"
+            name="link_keywords"
+            placeholder="HTML 关键词（逗号分隔，可留空）"
+          />
+          <textarea
+            className="field min-h-20"
+            name="authorization_note"
+            placeholder="说明官方来源、使用依据及已检查的网站条款"
+            required
+          />
+          <label className="flex items-start gap-2 text-xs text-[var(--muted)]">
+            <input className="mt-0.5" required type="checkbox" />
+            我已确认该官方来源允许上述自动访问方式，并对配置负责。
+          </label>
+          <button
+            className="btn-primary"
+            disabled={createMutation.isPending || !companies.length}
+          >
+            {createMutation.isPending ? "保存中…" : "保存并启用定时同步"}
+          </button>
+        </form>
+
+        <div>
+          <h3 className="mb-3 text-sm font-bold">已配置来源</h3>
+          {crawlerSources.length ? (
+            <ul className="space-y-3">
+              {crawlerSources.map((source) => (
+                <li
+                  className="rounded-xl border border-[var(--border)] p-4"
+                  key={source.id}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <b>{source.name}</b>
+                      <p className="mt-1 truncate text-xs text-[var(--muted)]">
+                        {source.feed_url}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--muted)]">
+                        {source.last_crawled_at
+                          ? `上次同步：${new Date(source.last_crawled_at).toLocaleString("zh-CN")}`
+                          : "尚未同步"}
+                        {source.last_crawl_status
+                          ? ` · ${source.last_crawl_status === "completed" ? "成功" : "失败"}`
+                          : ""}
+                      </p>
+                    </div>
+                    <button
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-teal-600 disabled:opacity-50"
+                      disabled={crawlMutation.isPending}
+                      onClick={() => crawlMutation.mutate(source.id)}
+                      type="button"
+                    >
+                      <RefreshCw
+                        aria-hidden="true"
+                        className={
+                          crawlMutation.isPending ? "animate-spin" : ""
+                        }
+                        size={15}
+                      />
+                      立即同步
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState text="尚未配置官方招聘来源" />
+          )}
+          {runs.length > 0 && (
+            <div className="mt-5">
+              <h3 className="mb-2 text-sm font-bold">最近同步记录</h3>
+              <ul className="divide-y divide-[var(--border)] text-xs">
+                {runs.slice(0, 5).map((run) => (
+                  <li className="flex justify-between gap-3 py-2" key={run.id}>
+                    <span>
+                      {run.source_id
+                        ? (sourceNames.get(run.source_id) ??
+                          `来源 #${run.source_id}`)
+                        : "已删除来源"}
+                    </span>
+                    <span
+                      className={
+                        run.status === "failed"
+                          ? "text-rose-600"
+                          : "text-teal-600"
+                      }
+                    >
+                      {run.status === "completed"
+                        ? `新增 ${run.discovered_rows} / 更新 ${run.updated_rows}`
+                        : `失败：${run.error_message ?? "未知错误"}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

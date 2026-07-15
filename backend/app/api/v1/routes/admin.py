@@ -8,8 +8,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentAdmin, Db
 from app.core.config import settings
-from app.models import Company, DataSource, ImportBatch, Job
+from app.models import Company, CrawlRun, DataSource, ImportBatch, Job
 from app.schemas import (
+    CrawlRunOut,
     DataQualityStats,
     DataSourceCreate,
     DataSourceOut,
@@ -22,6 +23,7 @@ from app.schemas import (
 )
 from app.services.audit import record_audit
 from app.services.data_import import import_csv
+from app.services.official_crawler import run_source_crawl
 
 router = APIRouter(prefix="/admin", tags=["本地数据治理"])
 
@@ -53,7 +55,11 @@ def list_data_sources(
 
 @router.post("/data-sources", response_model=DataSourceOut, status_code=status.HTTP_201_CREATED)
 def create_data_source(payload: DataSourceCreate, db: Db, admin: CurrentAdmin) -> DataSource:
+    if payload.company_id is not None and db.get(Company, payload.company_id) is None:
+        raise HTTPException(status_code=404, detail="绑定企业不存在")
     item = DataSource(**payload.model_dump(), created_by=admin.id)
+    if item.is_crawl_enabled:
+        item.next_crawl_at = datetime.now(UTC)
     db.add(item)
     try:
         db.flush()
@@ -81,8 +87,17 @@ def update_data_source(
     if item is None:
         raise HTTPException(status_code=404, detail="数据源不存在")
     changes = payload.model_dump(exclude_unset=True)
+    company_id = changes.get("company_id", item.company_id)
+    feed_url = changes.get("feed_url", item.feed_url)
+    crawl_enabled = changes.get("is_crawl_enabled", item.is_crawl_enabled)
+    if company_id is not None and db.get(Company, company_id) is None:
+        raise HTTPException(status_code=404, detail="绑定企业不存在")
+    if crawl_enabled and (company_id is None or not feed_url):
+        raise HTTPException(status_code=422, detail="启用自动同步前必须选择企业并填写官方地址")
     for key, value in changes.items():
         setattr(item, key, value)
+    if changes.get("is_crawl_enabled") is True:
+        item.next_crawl_at = datetime.now(UTC)
     record_audit(
         db,
         user_id=admin.id,
@@ -98,6 +113,51 @@ def update_data_source(
         raise HTTPException(status_code=409, detail="数据源名称已存在") from None
     db.refresh(item)
     return item
+
+
+@router.post("/data-sources/{item_id}/crawl", response_model=CrawlRunOut)
+def crawl_data_source(item_id: int, db: Db, admin: CurrentAdmin) -> CrawlRun:
+    source = db.get(DataSource, item_id)
+    if source is None or not source.is_active:
+        raise HTTPException(status_code=404, detail="可用数据源不存在")
+    if source.company_id is None or not source.feed_url:
+        raise HTTPException(status_code=422, detail="请先绑定企业并配置官方招聘源地址")
+    run = run_source_crawl(db, source)
+    record_audit(
+        db,
+        user_id=admin.id,
+        action="crawler.completed" if run.status == "completed" else "crawler.failed",
+        entity_type="crawl_run",
+        entity_id=run.id,
+        details={"source_id": source.id, "status": run.status},
+    )
+    db.commit()
+    return run
+
+
+@router.get("/crawl-runs", response_model=Page[CrawlRunOut])
+def list_crawl_runs(
+    db: Db,
+    _: CurrentAdmin,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> Page[CrawlRunOut]:
+    total = db.scalar(select(func.count(CrawlRun.id))) or 0
+    items = list(
+        db.scalars(
+            select(CrawlRun)
+            .order_by(CrawlRun.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    )
+    return Page(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=math.ceil(total / page_size) if total else 0,
+    )
 
 
 @router.post("/imports", response_model=ImportBatchOut, status_code=status.HTTP_201_CREATED)

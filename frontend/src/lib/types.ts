@@ -13,6 +13,10 @@ export type Company = {
   company_type: string;
   work_cities: string;
   education_requirement: string;
+  website: string | null;
+  campus_website: string | null;
+  recruitment_status: string;
+  last_verified_at: string | null;
   is_demo: boolean;
 };
 
@@ -25,8 +29,12 @@ export type Job = {
   education_requirement: string;
   description: string;
   requirements: string;
+  application_url: string | null;
+  published_at: string | null;
   deadline: string | null;
   recruitment_status: string;
+  data_source: string;
+  last_verified_at: string | null;
   is_demo: boolean;
 };
 
@@ -136,7 +144,29 @@ export type DataSource = {
   authorization_note: string;
   license_info: string | null;
   is_active: boolean;
+  company_id: number | null;
+  feed_url: string | null;
+  parser_mode: "auto" | "html_links" | "rss" | "atom" | "json_feed";
+  link_keywords: string[];
+  is_crawl_enabled: boolean;
+  crawl_interval_minutes: number;
   last_import_at: string | null;
+  last_crawled_at: string | null;
+  next_crawl_at: string | null;
+  last_crawl_status: string | null;
+  created_at: string;
+};
+
+export type CrawlRun = {
+  id: number;
+  source_id: number | null;
+  status: "running" | "completed" | "failed";
+  discovered_rows: number;
+  updated_rows: number;
+  skipped_rows: number;
+  error_message: string | null;
+  started_at: string;
+  finished_at: string | null;
   created_at: string;
 };
 

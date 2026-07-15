@@ -210,6 +210,38 @@ class DataSource(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     last_import_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "companies.id",
+            ondelete="SET NULL",
+            name="fk_data_sources_company_id_companies",
+            use_alter=True,
+        ),
+        index=True,
+    )
+    feed_url: Mapped[str | None] = mapped_column(String(1000))
+    parser_mode: Mapped[str] = mapped_column(String(30), default="auto")
+    link_keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    is_crawl_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    crawl_interval_minutes: Mapped[int] = mapped_column(default=360)
+    last_crawled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_crawl_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    last_crawl_status: Mapped[str | None] = mapped_column(String(30))
+
+
+class CrawlRun(TimestampMixin, Base):
+    __tablename__ = "crawl_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("data_sources.id", ondelete="SET NULL"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(30), default="running", index=True)
+    discovered_rows: Mapped[int] = mapped_column(default=0)
+    updated_rows: Mapped[int] = mapped_column(default=0)
+    skipped_rows: Mapped[int] = mapped_column(default=0)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ImportBatch(TimestampMixin, Base):

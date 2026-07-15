@@ -1,4 +1,8 @@
+import asyncio
+import contextlib
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,16 +11,44 @@ from starlette.requests import Request
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.db.session import SessionLocal
+from app.services.official_crawler import run_due_crawls
 
 logger = logging.getLogger(__name__)
+
+
+def _crawl_due_sources() -> None:
+    with SessionLocal() as db:
+        run_due_crawls(db)
+
+
+async def _crawler_loop() -> None:
+    while True:
+        try:
+            await asyncio.to_thread(_crawl_due_sources)
+        except Exception:
+            logger.exception("Official source scheduler failed")
+        await asyncio.sleep(settings.crawler_tick_seconds)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    task = asyncio.create_task(_crawler_loop()) if settings.crawler_enabled else None
+    yield
+    if task is not None:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
 
 app = FastAPI(
     title=settings.app_name,
     description="面向 2027 届校招的 AI 求职管理平台 API。Demo 数据不代表实时招聘状态。",
-    version="0.3.0",
+    version="0.4.0",
     openapi_url="/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,

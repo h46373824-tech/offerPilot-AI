@@ -61,6 +61,68 @@ test("本地管理员可以登记授权数据源", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("岗位库可以跳转到官方投递链接", async ({ page }) => {
+  const credentials = {
+    email: "admin@offerpilot.example.com",
+    password: "Local-Admin-2027!",
+  };
+  const apiUrl = process.env.E2E_API_URL ?? "http://localhost:8000/api/v1";
+  const registered = await page.request.post(`${apiUrl}/auth/register`, {
+    data: { ...credentials, full_name: "投递链接测试管理员" },
+  });
+  const authResponse = registered.ok()
+    ? registered
+    : await page.request.post(`${apiUrl}/auth/login`, { data: credentials });
+  expect(authResponse.ok()).toBeTruthy();
+  const { access_token: token } = (await authResponse.json()) as {
+    access_token: string;
+  };
+  const headers = { Authorization: `Bearer ${token}` };
+  const suffix = Date.now();
+  const company = await page.request.post(`${apiUrl}/companies`, {
+    data: {
+      name: `投递链接测试企业-${suffix}`,
+      industry: "人工智能",
+      company_type: "测试",
+      education_requirement: "待核验",
+      work_cities: "待核验",
+    },
+    headers,
+  });
+  expect(company.ok()).toBeTruthy();
+  const companyId = (await company.json()).id as number;
+  const title = `官方投递测试岗位-${suffix}`;
+  const applicationUrl = `https://careers.example.com/apply/${suffix}`;
+  const job = await page.request.post(`${apiUrl}/jobs`, {
+    data: {
+      title,
+      company_id: companyId,
+      category: "测试",
+      work_cities: "待核验",
+      education_requirement: "待核验",
+      description: "端到端测试",
+      requirements: "待核验",
+      application_url: applicationUrl,
+      recruitment_status: "unverified",
+    },
+    headers,
+  });
+  expect(job.ok()).toBeTruthy();
+
+  await page.goto("/");
+  await page.evaluate(
+    (accessToken) => localStorage.setItem("access_token", accessToken),
+    token,
+  );
+  await page.goto("/jobs");
+  await page.getByPlaceholder("输入关键词搜索").fill(title);
+  const link = page.getByRole("link", { name: "前往官方投递" });
+  await expect(link).toHaveAttribute("href", applicationUrl);
+  await expect(link).toHaveAttribute("target", "_blank");
+
+  await page.request.delete(`${apiUrl}/companies/${companyId}`, { headers });
+});
+
 test.describe("移动端", () => {
   const iphone = devices["iPhone 13"];
   test.use({

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bookmark, Search, X } from "lucide-react";
+import { Bookmark, ExternalLink, Search, X } from "lucide-react";
 import {
   Badge,
   EmptyState,
@@ -252,6 +252,10 @@ export function JobTable() {
         city: job.work_cities,
         education: job.education_requirement,
         deadline: job.deadline?.slice(0, 10) ?? "待核验",
+        applicationUrl: job.application_url,
+        status: job.recruitment_status,
+        isDemo: job.is_demo,
+        verified: Boolean(job.last_verified_at),
       })) ??
       jobs.map((job, index) => ({
         id: -(index + 1),
@@ -261,6 +265,10 @@ export function JobTable() {
         city: job[3],
         education: job[4],
         deadline: job[5],
+        applicationUrl: null,
+        status: "unverified",
+        isDemo: true,
+        verified: false,
       })),
     [companyNames, jobsQuery.data],
   );
@@ -319,6 +327,8 @@ export function JobTable() {
                 <th scope="col">城市</th>
                 <th scope="col">学历</th>
                 <th scope="col">截止时间</th>
+                <th scope="col">数据状态</th>
+                <th scope="col">官方投递</th>
                 <th scope="col">
                   <span className="sr-only">操作</span>
                 </th>
@@ -333,6 +343,36 @@ export function JobTable() {
                   <td>{row.city}</td>
                   <td>{row.education}</td>
                   <td>{row.deadline}</td>
+                  <td>
+                    <Badge
+                      tone={
+                        row.isDemo ? "slate" : row.verified ? "teal" : "amber"
+                      }
+                    >
+                      {row.isDemo
+                        ? "Demo · 非实时"
+                        : row.verified
+                          ? "已核验"
+                          : "待核验"}
+                    </Badge>
+                  </td>
+                  <td>
+                    {row.applicationUrl ? (
+                      <a
+                        className="inline-flex items-center gap-1 font-semibold whitespace-nowrap text-teal-600 hover:text-teal-700"
+                        href={row.applicationUrl}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        前往官方投递
+                        <ExternalLink aria-hidden="true" size={14} />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-[var(--muted)]">
+                        暂无链接
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <button
                       aria-label={`${favoriteIds.has(row.id) ? "取消收藏" : "收藏岗位"}：${row.title}`}

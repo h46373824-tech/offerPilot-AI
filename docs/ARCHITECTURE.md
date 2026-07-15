@@ -23,7 +23,7 @@ flowchart LR
     B -.->|缓存与任务扩展| R[("Redis")]
     M["项目维护者"] -->|迁移、种子、运维| B
     M -->|Alembic| P
-    X["未来合规数据源"] -.->|授权导入与核验| B
+    X["已登记的企业官方来源"] -->|robots 允许的低频 HTTP| B
 ```
 
 Redis 在 Compose 中作为基础服务运行并带健康检查；第一阶段核心请求不依赖 Redis 才能正确工作。缓存、限流、任务队列和提醒调度属于后续扩展。
@@ -91,6 +91,8 @@ backend/app/
 
 当前路由按资源分为 `auth`、`companies`、`jobs`、`favorites`、`applications`、`interviews`、`offers`、`notifications`、`resumes`、`job_alerts`、`activity` 和 `dashboard`。第二阶段新增 service 层承载附件存储、提醒生成和审计写入；更复杂的查询可继续下沉到 repository 层。
 
+第四阶段在 FastAPI lifespan 中启动单进程本地调度循环。循环只查询到期且启用的数据源，通过独立数据库 Session 运行同步；解析器位于 `services/official_crawler.py`。URL 在请求及重定向时进行公网校验，robots.txt、超时、响应大小和每批条数均为硬限制。该设计适合 Compose 中的单个 Uvicorn 实例；扩展为多实例前必须迁移到带分布式锁的任务队列。
+
 ### 4.3 数据层
 
 PostgreSQL 是系统事实来源，保存用户、企业、岗位和个人求职记录。SQLAlchemy 2 使用声明式类型映射，Alembic 管理 schema 版本。
@@ -110,6 +112,8 @@ erDiagram
     USERS ||--o{ DATA_SOURCES : creates
     USERS ||--o{ IMPORT_BATCHES : uploads
     DATA_SOURCES ||--o{ IMPORT_BATCHES : groups
+    DATA_SOURCES ||--o{ CRAWL_RUNS : records
+    COMPANIES ||--o{ DATA_SOURCES : binds
     DATA_SOURCES ||--o{ COMPANIES : traces
     DATA_SOURCES ||--o{ JOBS : traces
     COMPANIES ||--o{ JOBS : publishes

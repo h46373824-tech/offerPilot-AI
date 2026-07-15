@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Generic, Self, TypeVar
+from typing import Generic, Literal, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
@@ -72,6 +72,25 @@ class DataSourceBase(BaseModel):
     authorization_note: str = Field(min_length=3, max_length=2000)
     license_info: str | None = Field(default=None, max_length=500)
     is_active: bool = True
+    company_id: int | None = Field(default=None, gt=0)
+    feed_url: str | None = Field(default=None, max_length=1000)
+    parser_mode: Literal["auto", "html_links", "rss", "atom", "json_feed"] = "auto"
+    link_keywords: list[str] = Field(default_factory=list, max_length=30)
+    is_crawl_enabled: bool = False
+    crawl_interval_minutes: int = Field(default=360, ge=15, le=10080)
+
+    @field_validator("feed_url")
+    @classmethod
+    def validate_feed_url(cls, value: str | None) -> str | None:
+        if value and not value.lower().startswith(("http://", "https://")):
+            raise ValueError("官方招聘源仅支持 HTTP(S) 地址")
+        return value
+
+    @model_validator(mode="after")
+    def validate_crawl_configuration(self) -> Self:
+        if self.is_crawl_enabled and (self.company_id is None or not self.feed_url):
+            raise ValueError("启用自动同步前必须选择企业并填写官方招聘源地址")
+        return self
 
 
 class DataSourceCreate(DataSourceBase):
@@ -87,6 +106,19 @@ class DataSourceUpdate(BaseModel):
     authorization_note: str | None = Field(default=None, min_length=3, max_length=2000)
     license_info: str | None = Field(default=None, max_length=500)
     is_active: bool | None = None
+    company_id: int | None = Field(default=None, gt=0)
+    feed_url: str | None = Field(default=None, max_length=1000)
+    parser_mode: Literal["auto", "html_links", "rss", "atom", "json_feed"] | None = None
+    link_keywords: list[str] | None = Field(default=None, max_length=30)
+    is_crawl_enabled: bool | None = None
+    crawl_interval_minutes: int | None = Field(default=None, ge=15, le=10080)
+
+    @field_validator("feed_url")
+    @classmethod
+    def validate_feed_url(cls, value: str | None) -> str | None:
+        if value and not value.lower().startswith(("http://", "https://")):
+            raise ValueError("官方招聘源仅支持 HTTP(S) 地址")
+        return value
 
 
 class DataSourceOut(DataSourceBase):
@@ -95,8 +127,26 @@ class DataSourceOut(DataSourceBase):
     id: int
     created_by: int | None
     last_import_at: datetime | None
+    last_crawled_at: datetime | None
+    next_crawl_at: datetime | None
+    last_crawl_status: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class CrawlRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_id: int | None
+    status: str
+    discovered_rows: int
+    updated_rows: int
+    skipped_rows: int
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+    created_at: datetime
 
 
 class ImportBatchOut(BaseModel):

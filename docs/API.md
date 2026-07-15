@@ -460,6 +460,8 @@ GET /api/v1/notifications?unread_only=true
 | --- | --- | --- |
 | GET/POST | `/api/v1/admin/data-sources` | 数据源列表/登记授权来源 |
 | PATCH | `/api/v1/admin/data-sources/{id}` | 更新来源或停用 |
+| POST | `/api/v1/admin/data-sources/{id}/crawl` | 立即同步一个已配置官方来源 |
+| GET | `/api/v1/admin/crawl-runs` | 同步运行记录与错误摘要 |
 | POST | `/api/v1/admin/imports` | 上传 UTF-8 企业或岗位 CSV |
 | GET | `/api/v1/admin/imports` | 导入批次与错误摘要 |
 | GET | `/api/v1/admin/review` | 企业/岗位待核验队列 |
@@ -469,6 +471,8 @@ GET /api/v1/notifications?unread_only=true
 导入使用 `multipart/form-data`，字段为 `source_id`、`entity_type=company|job`、`file`。新增和更新记录一律设为非 Demo、`unverified` 且清空核验时间，不会直接显示为实时开放。企业按名称去重；岗位按关联企业与岗位名去重。
 
 本地管理员可通过 `ADMIN_EMAILS` 在首次注册时授予，或运行 `python -m app.db.promote_admin <email>` 提升已有账号。
+
+官方来源还可设置 `company_id`、`feed_url`、`parser_mode`、`link_keywords`、`is_crawl_enabled` 和 `crawl_interval_minutes`。启用同步必须绑定企业并提供官方 URL，间隔最短 15 分钟。同步响应包含 `status`、`discovered_rows`、`updated_rows`、`skipped_rows` 和 `error_message`；自动发现岗位始终以 `unverified`、`last_verified_at=null` 写入，其 `application_url` 由官方来源提供。
 
 ## 16. Dashboard
 
