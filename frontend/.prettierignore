@@ -1,0 +1,7 @@
+.next/
+node_modules/
+package-lock.json
+next-env.d.ts
+public/
+AGENTS.md
+CLAUDE.md
