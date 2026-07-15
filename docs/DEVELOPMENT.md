@@ -24,6 +24,14 @@ git status --short
 
 ### 2.1 完整 Docker 环境
 
+本项目按本地部署维护。Windows 首次启动推荐：
+
+```powershell
+.\scripts\setup-local.ps1 -AdminEmail "admin@offerpilot.example.com"
+```
+
+脚本只在仓库根目录创建被忽略的 `.env`，并将业务数据保存在本项目 Docker 卷中。
+
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build
@@ -41,6 +49,12 @@ backend 容器会自动运行迁移和幂等 Demo 种子。查看状态：
 ```bash
 docker compose ps
 docker compose logs -f backend frontend
+```
+
+将已注册账号提升为本地管理员：
+
+```powershell
+.\scripts\promote-admin.ps1 -Email "your-email@example.com"
 ```
 
 ### 2.2 数据服务使用 Docker，应用本地运行

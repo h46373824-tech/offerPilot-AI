@@ -35,6 +35,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       CORS_ORIGINS: http://localhost:3000
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      MAX_IMPORT_BYTES: ${MAX_IMPORT_BYTES:-5242880}
     ports:
       - "8000:8000"
     volumes:

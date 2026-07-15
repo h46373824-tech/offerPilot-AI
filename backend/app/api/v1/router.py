@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.routes import (
     activity,
+    admin,
     applications,
     auth,
     companies,
@@ -28,3 +29,4 @@ api_router.include_router(dashboard.router)
 api_router.include_router(resumes.router)
 api_router.include_router(job_alerts.router)
 api_router.include_router(activity.router)
+api_router.include_router(admin.router)

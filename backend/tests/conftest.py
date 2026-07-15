@@ -3,6 +3,9 @@ from collections.abc import Generator
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["SECRET_KEY"] = "test-secret-key-at-least-16-characters"
+os.environ["ADMIN_EMAILS"] = (
+    "student@example.com,phase2@example.com,admin@example.com,owner@example.com"
+)
 import pytest
 from fastapi.testclient import TestClient
 

@@ -121,8 +121,64 @@ export type CurrentUser = {
   id: number;
   email: string;
   full_name: string;
+  is_admin: boolean;
   graduation_year: number | null;
   education_level: string | null;
   target_cities: string | null;
   notifications_enabled: boolean;
+};
+
+export type DataSource = {
+  id: number;
+  name: string;
+  source_type: string;
+  base_url: string | null;
+  authorization_note: string;
+  license_info: string | null;
+  is_active: boolean;
+  last_import_at: string | null;
+  created_at: string;
+};
+
+export type ImportBatch = {
+  id: number;
+  source_id: number | null;
+  entity_type: "company" | "job";
+  filename: string;
+  status: string;
+  total_rows: number;
+  created_rows: number;
+  updated_rows: number;
+  skipped_rows: number;
+  error_rows: number;
+  errors: Array<{ row: number; message: string }>;
+  created_at: string;
+};
+
+export type ReviewItem = {
+  entity_type: "company" | "job";
+  id: number;
+  name: string;
+  company_name: string | null;
+  source_name: string;
+  recruitment_status: string;
+  last_verified_at: string | null;
+  updated_at: string;
+};
+
+export type DataQualityStats = {
+  companies_total: number;
+  jobs_total: number;
+  demo_records: number;
+  verified_records: number;
+  unverified_records: number;
+  stale_records: number;
+  active_sources: number;
+  import_batches: number;
+  source_coverage: Array<{
+    source_id: number | null;
+    source_name: string;
+    companies: number;
+    jobs: number;
+  }>;
 };

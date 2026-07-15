@@ -2,7 +2,7 @@
 
 ## 1. 架构目标
 
-第一阶段采用前后端分离的模块化单体架构，在保持本地开发和部署简单的同时，为后续数据核验、提醒任务、缓存、AI 辅助和水平扩展保留清晰边界。
+项目采用本地优先的前后端分离模块化单体架构，在保持单机部署简单的同时，为数据核验、提醒任务、缓存和 AI 辅助保留清晰边界。
 
 设计原则：
 
@@ -107,6 +107,11 @@ erDiagram
     USERS ||--o{ RESUMES : owns
     USERS ||--o{ JOB_ALERTS : owns
     USERS ||--o{ AUDIT_LOGS : performs
+    USERS ||--o{ DATA_SOURCES : creates
+    USERS ||--o{ IMPORT_BATCHES : uploads
+    DATA_SOURCES ||--o{ IMPORT_BATCHES : groups
+    DATA_SOURCES ||--o{ COMPANIES : traces
+    DATA_SOURCES ||--o{ JOBS : traces
     COMPANIES ||--o{ JOBS : publishes
     JOBS ||--o{ FAVORITES : bookmarked
     JOBS ||--o{ APPLICATIONS : applied_to
@@ -187,6 +192,8 @@ Dashboard 在单次请求中计算：
 - `API_V1_PREFIX`（采用默认值时为 `/api/v1`）
 - `UPLOAD_DIR`（本地附件目录）
 - `MAX_UPLOAD_BYTES`（附件大小上限）
+- `MAX_IMPORT_BYTES`（本地 CSV 大小上限）
+- `ADMIN_EMAILS`（本地管理员首次注册白名单）
 
 前端构建期公开变量为 `NEXT_PUBLIC_API_URL`。带 `NEXT_PUBLIC_` 前缀的变量会进入浏览器代码，不得包含密钥。
 

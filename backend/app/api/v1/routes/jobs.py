@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.api.deps import CurrentUser, Db
+from app.api.deps import CurrentAdmin, CurrentUser, Db
 from app.models import Company, Job
 from app.schemas import JobCreate, JobOut, JobUpdate, Page
 
@@ -80,7 +80,7 @@ def get_job(item_id: int, db: Db, _: CurrentUser) -> Job:
 
 
 @router.post("", response_model=JobOut, status_code=status.HTTP_201_CREATED)
-def create_job(payload: JobCreate, db: Db, _: CurrentUser) -> Job:
+def create_job(payload: JobCreate, db: Db, _: CurrentAdmin) -> Job:
     if db.get(Company, payload.company_id) is None:
         raise HTTPException(status_code=404, detail="企业不存在")
     item = Job(**payload.model_dump())
@@ -91,7 +91,7 @@ def create_job(payload: JobCreate, db: Db, _: CurrentUser) -> Job:
 
 
 @router.patch("/{item_id}", response_model=JobOut)
-def update_job(item_id: int, payload: JobUpdate, db: Db, _: CurrentUser) -> Job:
+def update_job(item_id: int, payload: JobUpdate, db: Db, _: CurrentAdmin) -> Job:
     item = _get(db, item_id)
     changes = payload.model_dump(exclude_unset=True)
     company_id = changes.get("company_id")
@@ -105,7 +105,7 @@ def update_job(item_id: int, payload: JobUpdate, db: Db, _: CurrentUser) -> Job:
 
 
 @router.delete("/{item_id}", status_code=204)
-def delete_job(item_id: int, db: Db, _: CurrentUser) -> None:
+def delete_job(item_id: int, db: Db, _: CurrentAdmin) -> None:
     item = _get(db, item_id)
     db.delete(item)
     db.commit()

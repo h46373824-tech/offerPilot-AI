@@ -12,7 +12,7 @@
 | 数据格式 | JSON |
 | 认证方式 | `Authorization: Bearer <JWT>` |
 
-除 `GET /health`、注册和两种登录端点外，第一阶段业务接口均需要有效 JWT。
+除 `GET /health`、注册和两种登录端点外，业务接口均需要有效 JWT。企业和岗位读取对登录用户开放，写操作及 `/api/v1/admin/*` 仅允许本地管理员。
 
 > API 返回的种子企业与岗位是 Demo 数据，不代表真实或实时招聘。客户端必须保留 `is_demo`、`data_source`、`recruitment_status` 和 `last_verified_at` 的语义。
 
@@ -454,7 +454,23 @@ GET /api/v1/notifications?unread_only=true
 
 提醒覆盖收藏岗位截止、48 小时内面试和 3 天内 Offer 决策截止，并按关联资源去重。审计详情只保存最小化动作摘要，不返回密码、Token 或简历正文。
 
-## 15. Dashboard
+## 15. 本地数据治理（管理员）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET/POST | `/api/v1/admin/data-sources` | 数据源列表/登记授权来源 |
+| PATCH | `/api/v1/admin/data-sources/{id}` | 更新来源或停用 |
+| POST | `/api/v1/admin/imports` | 上传 UTF-8 企业或岗位 CSV |
+| GET | `/api/v1/admin/imports` | 导入批次与错误摘要 |
+| GET | `/api/v1/admin/review` | 企业/岗位待核验队列 |
+| PATCH | `/api/v1/admin/review/{entity_type}/{id}` | 核验通过或关闭记录 |
+| GET | `/api/v1/admin/quality` | 质量、过期记录和来源覆盖统计 |
+
+导入使用 `multipart/form-data`，字段为 `source_id`、`entity_type=company|job`、`file`。新增和更新记录一律设为非 Demo、`unverified` 且清空核验时间，不会直接显示为实时开放。企业按名称去重；岗位按关联企业与岗位名去重。
+
+本地管理员可通过 `ADMIN_EMAILS` 在首次注册时授予，或运行 `python -m app.db.promote_admin <email>` 提升已有账号。
+
+## 16. Dashboard
 
 `GET /api/v1/dashboard/stats`
 
@@ -500,7 +516,7 @@ GET /api/v1/notifications?unread_only=true
 
 种子企业是 Demo 数据，因此 `open_companies` 不能解释为真实开放企业数。
 
-## 16. curl 示例
+## 17. curl 示例
 
 注册并保存返回的 Token 后：
 
@@ -523,7 +539,7 @@ Invoke-RestMethod `
   -Headers @{ Authorization = "Bearer $token" }
 ```
 
-## 17. 兼容性与演进
+## 18. 兼容性与演进
 
 - 新增可选字段通常可以保持 v1 兼容；
 - 删除字段、改名、改变类型或状态语义需要新版本或明确迁移期；

@@ -45,6 +45,7 @@ class UserOut(BaseModel):
     email: EmailStr
     full_name: str
     is_active: bool
+    is_admin: bool
     graduation_year: int | None
     education_level: str | None
     target_cities: str | None
@@ -60,6 +61,95 @@ class UserUpdate(BaseModel):
     education_level: str | None = Field(default=None, max_length=50)
     target_cities: str | None = Field(default=None, max_length=500)
     notifications_enabled: bool | None = None
+
+
+class DataSourceBase(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=200)
+    source_type: str = Field(default="authorized_csv", max_length=50)
+    base_url: str | None = Field(default=None, max_length=500)
+    authorization_note: str = Field(min_length=3, max_length=2000)
+    license_info: str | None = Field(default=None, max_length=500)
+    is_active: bool = True
+
+
+class DataSourceCreate(DataSourceBase):
+    pass
+
+
+class DataSourceUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    source_type: str | None = Field(default=None, max_length=50)
+    base_url: str | None = Field(default=None, max_length=500)
+    authorization_note: str | None = Field(default=None, min_length=3, max_length=2000)
+    license_info: str | None = Field(default=None, max_length=500)
+    is_active: bool | None = None
+
+
+class DataSourceOut(DataSourceBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_by: int | None
+    last_import_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ImportBatchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_id: int | None
+    uploaded_by: int | None
+    entity_type: str
+    filename: str
+    status: str
+    total_rows: int
+    created_rows: int
+    updated_rows: int
+    skipped_rows: int
+    error_rows: int
+    errors: list[dict[str, object]]
+    created_at: datetime
+
+
+class ReviewPayload(BaseModel):
+    action: str = Field(pattern="^(approve|reject)$")
+    recruitment_status: str = Field(default="open", max_length=50)
+
+
+class QualitySourceItem(BaseModel):
+    source_id: int | None
+    source_name: str
+    companies: int = Field(ge=0)
+    jobs: int = Field(ge=0)
+
+
+class DataQualityStats(BaseModel):
+    companies_total: int = Field(ge=0)
+    jobs_total: int = Field(ge=0)
+    demo_records: int = Field(ge=0)
+    verified_records: int = Field(ge=0)
+    unverified_records: int = Field(ge=0)
+    stale_records: int = Field(ge=0)
+    active_sources: int = Field(ge=0)
+    import_batches: int = Field(ge=0)
+    source_coverage: list[QualitySourceItem]
+
+
+class ReviewItem(BaseModel):
+    entity_type: str
+    id: int
+    name: str
+    company_name: str | None = None
+    source_name: str
+    recruitment_status: str
+    last_verified_at: datetime | None
+    updated_at: datetime
 
 
 class CompanyBase(BaseModel):

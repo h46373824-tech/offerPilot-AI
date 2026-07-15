@@ -17,6 +17,7 @@ import {
   Moon,
   Search,
   Settings,
+  ShieldCheck,
   Siren,
   Sun,
   Trophy,
@@ -39,6 +40,7 @@ const navigation = [
   ["/favorites", "我的收藏", Bookmark],
   ["/offers", "Offer 管理", Trophy],
   ["/analytics", "数据分析", BarChart3],
+  ["/admin", "数据治理", ShieldCheck],
   ["/settings", "设置", Settings],
 ] as const;
 
@@ -110,6 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <nav className="space-y-1 px-3 pb-5">
           {navigation.map(([href, label, Icon]) => {
+            if (href === "/admin" && !user.data?.is_admin) return null;
             const active = pathname === href;
 
             return (

@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, Db
+from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import User
 from app.schemas import LoginRequest, Token, UserCreate, UserOut, UserUpdate
@@ -35,6 +36,7 @@ def register(payload: UserCreate, db: Db) -> Token:
         email=email,
         full_name=payload.full_name.strip(),
         hashed_password=hash_password(payload.password),
+        is_admin=email in settings.admin_email_set,
     )
     db.add(user)
     try:

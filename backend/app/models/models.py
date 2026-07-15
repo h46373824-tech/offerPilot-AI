@@ -57,6 +57,9 @@ class Company(TimestampMixin, Base):
     major_requirement: Mapped[str | None] = mapped_column(Text)
     work_cities: Mapped[str] = mapped_column(String(500))
     data_source: Mapped[str] = mapped_column(String(200), default="manual")
+    data_source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("data_sources.id", ondelete="SET NULL"), index=True
+    )
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     jobs: Mapped[list["Job"]] = relationship(back_populates="company", cascade="all, delete-orphan")
@@ -80,6 +83,9 @@ class Job(TimestampMixin, Base):
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     recruitment_status: Mapped[str] = mapped_column(String(50), default="unverified", index=True)
     data_source: Mapped[str] = mapped_column(String(200), default="manual")
+    data_source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("data_sources.id", ondelete="SET NULL"), index=True
+    )
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     company: Mapped[Company] = relationship(back_populates="jobs")
@@ -189,6 +195,41 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+class DataSource(TimestampMixin, Base):
+    __tablename__ = "data_sources"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    source_type: Mapped[str] = mapped_column(String(50), default="authorized_csv")
+    base_url: Mapped[str | None] = mapped_column(String(500))
+    authorization_note: Mapped[str] = mapped_column(Text)
+    license_info: Mapped[str | None] = mapped_column(String(500))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    last_import_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ImportBatch(TimestampMixin, Base):
+    __tablename__ = "import_batches"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("data_sources.id", ondelete="SET NULL"), index=True
+    )
+    uploaded_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    entity_type: Mapped[str] = mapped_column(String(30), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(30), default="processing", index=True)
+    total_rows: Mapped[int] = mapped_column(default=0)
+    created_rows: Mapped[int] = mapped_column(default=0)
+    updated_rows: Mapped[int] = mapped_column(default=0)
+    skipped_rows: Mapped[int] = mapped_column(default=0)
+    error_rows: Mapped[int] = mapped_column(default=0)
+    errors: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 
 
 Index("ix_jobs_search", Job.title, Job.category, Job.work_cities)

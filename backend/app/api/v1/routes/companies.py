@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.api.deps import CurrentUser, Db
+from app.api.deps import CurrentAdmin, CurrentUser, Db
 from app.models import Company
 from app.schemas import CompanyCreate, CompanyOut, CompanyUpdate, Page
 
@@ -67,7 +67,7 @@ def list_companies(
 
 
 @router.post("", response_model=CompanyOut, status_code=status.HTTP_201_CREATED)
-def create_company(payload: CompanyCreate, db: Db, _: CurrentUser) -> Company:
+def create_company(payload: CompanyCreate, db: Db, _: CurrentAdmin) -> Company:
     item = Company(**payload.model_dump())
     db.add(item)
     db.commit()
@@ -88,7 +88,7 @@ def get_company(item_id: int, db: Db, _: CurrentUser) -> Company:
 
 
 @router.patch("/{item_id}", response_model=CompanyOut)
-def update_company(item_id: int, payload: CompanyUpdate, db: Db, _: CurrentUser) -> Company:
+def update_company(item_id: int, payload: CompanyUpdate, db: Db, _: CurrentAdmin) -> Company:
     item = _get_company(db, item_id)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
@@ -98,7 +98,7 @@ def update_company(item_id: int, payload: CompanyUpdate, db: Db, _: CurrentUser)
 
 
 @router.delete("/{item_id}", status_code=204)
-def delete_company(item_id: int, db: Db, _: CurrentUser) -> None:
+def delete_company(item_id: int, db: Db, _: CurrentAdmin) -> None:
     item = _get_company(db, item_id)
     db.delete(item)
     db.commit()
