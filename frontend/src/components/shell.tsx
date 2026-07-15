@@ -3,30 +3,38 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
-  Bell,
   Bookmark,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   FileCheck2,
+  FileUser,
   LayoutDashboard,
   Menu,
   Moon,
   Search,
   Settings,
+  Siren,
   Sun,
   Trophy,
   X,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui";
+import { NotificationMenu } from "@/components/notification-menu";
+import { apiFetch } from "@/lib/api";
+import { useHasToken } from "@/lib/auth";
+import type { CurrentUser } from "@/lib/types";
 
 const navigation = [
   ["/dashboard", "数据总览", LayoutDashboard],
   ["/companies", "企业库", Building2],
   ["/jobs", "岗位库", BriefcaseBusiness],
   ["/applications", "投递管理", FileCheck2],
+  ["/resumes", "简历中心", FileUser],
+  ["/alerts", "岗位订阅", Siren],
   ["/calendar", "校招日历", CalendarDays],
   ["/favorites", "我的收藏", Bookmark],
   ["/offers", "Offer 管理", Trophy],
@@ -36,7 +44,13 @@ const navigation = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const authenticated = useHasToken();
   const { dark, toggleDark, mobileOpen, setMobileOpen } = useUiStore();
+  const user = useQuery({
+    enabled: authenticated,
+    queryKey: ["current-user"],
+    queryFn: () => apiFetch<CurrentUser>("/auth/me"),
+  });
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -153,23 +167,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Moon aria-hidden="true" size={20} />
               )}
             </button>
-            <button
-              aria-label="查看通知，有未读消息"
-              className="relative rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800"
-              type="button"
-            >
-              <Bell aria-hidden="true" size={20} />
-              <span
-                aria-hidden="true"
-                className="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-500"
-              />
-            </button>
+            <NotificationMenu />
             <div
-              aria-label="当前用户：应届生用户"
+              aria-label={`当前用户：${user.data?.full_name ?? "应届生用户"}`}
               className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-sm font-bold text-white"
               role="img"
             >
-              应
+              {(user.data?.full_name ?? "应届生").slice(0, 1)}
             </div>
           </div>
         </header>

@@ -6,7 +6,7 @@
 
 ## 当前阶段
 
-本仓库是第一阶段全栈 MVP，提供可运行的前端、后端 API、数据库模型、迁移、演示数据、Docker Compose 和 CI 基础设施。项目名称中的“AI”代表产品方向；第一阶段聚焦可靠的求职数据管理基础，尚未接入大模型，也不会生成未经核验的招聘事实。
+本仓库已完成第二阶段流程完善：在第一阶段全栈 MVP 基础上，全部核心业务页已接入 API，并加入简历版本与附件、岗位订阅、截止/面试/Offer 提醒、状态流转、个人审计日志、PostgreSQL 集成测试和 Playwright 端到端测试。项目名称中的“AI”代表产品方向；当前仍聚焦可靠的求职管理，不生成未经核验的招聘事实。
 
 ## 功能清单
 
@@ -15,7 +15,10 @@
 - 登录、注册与 JWT 登录态接入
 - Dashboard：企业与学历统计、今日新增、投递/面试/Offer 数量、即将截止岗位、投递趋势、行业分布、最近投递
 - 企业库与岗位库：关键词搜索、筛选入口和空状态
-- 投递管理、校招日历、收藏、Offer 管理、数据分析、设置页面
+- 投递管理、校招日历、收藏、Offer 管理、数据分析、设置页面均使用当前用户 API 数据
+- 简历中心：PDF/DOC/DOCX 上传、版本、默认简历、下载、删除及投递关联
+- 岗位订阅：关键词/城市/类别条件、运行频率、启停、手动匹配
+- 通知中心：截止、面试与 Offer 提醒、未读数、立即检查和全部已读
 - 桌面端侧边导航、顶部导航及移动端抽屉导航
 - 深色模式，偏好保存在浏览器本地
 - 通用加载、空数据和错误状态组件
@@ -26,7 +29,8 @@
 - FastAPI 健康检查和自动生成的 OpenAPI 文档
 - 用户注册、登录、JWT Bearer 认证和当前用户接口
 - 企业与岗位 CRUD，支持分页、搜索、筛选和排序
-- 收藏分页、投递/面试/Offer 完整 CRUD、通知分页与批量已读接口
+- 收藏分页、投递/面试/Offer 完整 CRUD、受控状态流转、通知分页与批量已读接口
+- 用户资料与偏好更新、简历文件 API、岗位订阅 CRUD/预览/运行、提醒生成和个人审计日志
 - Dashboard 聚合统计接口
 - SQLAlchemy 2 数据模型与 Alembic 初始迁移
 - 关键认证和企业接口的基础测试
@@ -66,11 +70,13 @@ offerPilot-AI/
 │   │   ├── db/              # 会话与种子数据
 │   │   ├── models/          # SQLAlchemy 模型
 │   │   └── schemas/         # Pydantic Schema
-│   └── tests/               # 后端测试
+│   ├── data/uploads/        # 本地开发附件目录（不提交）
+│   └── tests/               # 单元/API 与 PostgreSQL 集成测试
 ├── database/                # 数据库相关扩展目录
 ├── docker/                  # Docker 扩展配置目录
 ├── docs/                    # 产品、架构、数据库、API 与开发文档
 ├── frontend/
+│   ├── e2e/                 # Playwright 关键路径测试
 │   ├── public/
 │   └── src/
 │       ├── app/             # Next.js App Router 页面
@@ -201,6 +207,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 | `SECRET_KEY` | JWT 签名密钥 | 长随机值，禁止提交 |
 | `CORS_ORIGINS` | 允许的前端来源，多个值用逗号分隔 | `http://localhost:3000` |
 | `NEXT_PUBLIC_API_URL` | 浏览器请求的 API 前缀 | `http://localhost:8000/api/v1` |
+| `UPLOAD_DIR` | 简历附件存储目录 | `data/uploads` |
+| `MAX_UPLOAD_BYTES` | 单个附件最大字节数 | `10485760` |
 
 `.env` 和 `.env.local` 已加入 `.gitignore`。生产环境必须使用密钥管理服务，不得采用模板默认值。
 
@@ -251,11 +259,26 @@ cd backend
 pip install -e ".[dev]"
 ruff check .
 ruff format --check .
-mypy app
+mypy app tests
 pytest
 ```
 
-后端测试默认使用隔离的 SQLite 测试数据库，避免修改开发 PostgreSQL 数据。CI 会在 push 到 `dev`、`main` 以及 Pull Request 时运行前后端检查。
+PostgreSQL 集成测试：
+
+```bash
+cd backend
+TEST_POSTGRES_URL=postgresql+psycopg://... pytest tests/integration -m integration
+```
+
+浏览器端到端测试（需先启动完整 Docker 环境）：
+
+```bash
+cd frontend
+npx playwright install chromium
+npm run test:e2e -- --project=chromium
+```
+
+后端快速测试默认使用隔离的 SQLite 数据库。CI 另外启动 PostgreSQL 17 执行集成测试，并在完整 Compose 环境上运行 Playwright。
 
 ## API 快速体验
 
@@ -313,12 +336,11 @@ Authorization: Bearer <access_token>
 
 ## 后续路线图
 
-- 前端列表与全部业务页面深化为完整 API 驱动交互，加入更完整的编辑、分页与乐观更新体验
-- 简历版本管理、岗位订阅与通知调度
 - 基于明确授权来源的数据导入、去重、核验和过期治理
 - Redis 缓存、限流、后台任务与定时提醒
+- 简历恶意文件扫描、对象存储、加密和短期签名下载地址
 - 更细粒度的角色权限、刷新 Token、会话撤销和 HttpOnly Cookie 方案
-- PostgreSQL 集成测试、端到端测试、可访问性测试与覆盖率门禁
+- 扩展端到端、可访问性测试与覆盖率门禁
 - 可观测性、备份恢复、生产部署模板
 - 在可信数据和用户授权范围内探索简历匹配、投递复盘等 AI 辅助能力
 

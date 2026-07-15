@@ -8,7 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from app.api.deps import CurrentUser, Db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import User
-from app.schemas import LoginRequest, Token, UserCreate, UserOut
+from app.schemas import LoginRequest, Token, UserCreate, UserOut, UserUpdate
+from app.services.audit import record_audit
 
 router = APIRouter(prefix="/auth", tags=["身份认证"])
 
@@ -66,4 +67,22 @@ def oauth2_token(
 
 @router.get("/me", response_model=UserOut)
 def me(user: CurrentUser) -> User:
+    return user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(payload: UserUpdate, db: Db, user: CurrentUser) -> User:
+    changes = payload.model_dump(exclude_unset=True)
+    for key, value in changes.items():
+        setattr(user, key, value)
+    record_audit(
+        db,
+        user_id=user.id,
+        action="user.profile_updated",
+        entity_type="user",
+        entity_id=user.id,
+        details={"fields": sorted(changes)},
+    )
+    db.commit()
+    db.refresh(user)
     return user

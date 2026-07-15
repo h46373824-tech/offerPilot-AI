@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Search, X } from "lucide-react";
 import {
   Badge,
@@ -11,6 +11,8 @@ import {
 } from "@/components/status";
 import { companies, jobs } from "@/data/demo";
 import { apiFetch } from "@/lib/api";
+import { useHasToken } from "@/lib/auth";
+import type { ApiPage, Company, Favorite, Job } from "@/lib/types";
 
 type CompanyRow = readonly [
   name: string,
@@ -28,14 +30,6 @@ type CompanyApiItem = {
   work_cities: string;
   education_requirement: string;
   is_demo: boolean;
-};
-
-type ApiPage<T> = {
-  items: T[];
-  page: number;
-  page_size: number;
-  pages: number;
-  total: number;
 };
 
 function subscribeToAuth(onStoreChange: () => void) {
@@ -198,27 +192,103 @@ export function CompanyTable() {
 }
 
 export function JobTable() {
+  const authenticated = useHasToken();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [education, setEducation] = useState("");
+  const jobsQuery = useQuery({
+    enabled: authenticated,
+    queryKey: ["jobs"],
+    queryFn: () =>
+      apiFetch<ApiPage<Job>>(
+        "/jobs?page_size=100&sort_by=created_at&order=desc",
+      ),
+  });
+  const companiesQuery = useQuery({
+    enabled: authenticated,
+    queryKey: ["companies", "job-map"],
+    queryFn: () => apiFetch<ApiPage<Company>>("/companies?page_size=100"),
+  });
+  const favoritesQuery = useQuery({
+    enabled: authenticated,
+    queryKey: ["favorites"],
+    queryFn: () => apiFetch<ApiPage<Favorite>>("/favorites?page_size=100"),
+  });
+  const favoriteMutation = useMutation({
+    mutationFn: async ({
+      jobId,
+      active,
+    }: {
+      jobId: number;
+      active: boolean;
+    }) => {
+      if (active) {
+        await apiFetch<void>(`/favorites/${jobId}`, { method: "DELETE" });
+      } else {
+        await apiFetch<Favorite>("/favorites", {
+          method: "POST",
+          body: JSON.stringify({ job_id: jobId }),
+        });
+      }
+    },
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["favorites"] }),
+  });
+  const companyNames = useMemo(
+    () =>
+      new Map(
+        companiesQuery.data?.items.map((item) => [item.id, item.name]) ?? [],
+      ),
+    [companiesQuery.data],
+  );
+  const sourceRows = useMemo(
+    () =>
+      jobsQuery.data?.items.map((job) => ({
+        id: job.id,
+        title: job.title,
+        company: companyNames.get(job.company_id) ?? `企业 #${job.company_id}`,
+        category: job.category,
+        city: job.work_cities,
+        education: job.education_requirement,
+        deadline: job.deadline?.slice(0, 10) ?? "待核验",
+      })) ??
+      jobs.map((job, index) => ({
+        id: -(index + 1),
+        title: job[0],
+        company: job[1],
+        category: job[2],
+        city: job[3],
+        education: job[4],
+        deadline: job[5],
+      })),
+    [companyNames, jobsQuery.data],
+  );
   const categories = useMemo(
-    () => Array.from(new Set(jobs.map((job) => job[2]))),
-    [],
+    () => Array.from(new Set(sourceRows.map((job) => job.category))),
+    [sourceRows],
   );
   const educations = useMemo(
-    () => Array.from(new Set(jobs.map((job) => job[4]))),
-    [],
+    () => Array.from(new Set(sourceRows.map((job) => job.education))),
+    [sourceRows],
+  );
+  const favoriteIds = new Set(
+    favoritesQuery.data?.items.map((item) => item.job_id) ?? [],
   );
   const rows = useMemo(() => {
     const keyword = query.trim().toLowerCase();
 
-    return jobs.filter(
+    return sourceRows.filter(
       (job) =>
-        (!keyword || job.join(" ").toLowerCase().includes(keyword)) &&
-        (!category || job[2] === category) &&
-        (!education || job[4] === education),
+        (!keyword ||
+          Object.values(job).join(" ").toLowerCase().includes(keyword)) &&
+        (!category || job.category === category) &&
+        (!education || job.education === education),
     );
-  }, [category, education, query]);
+  }, [category, education, query, sourceRows]);
+
+  if (authenticated && jobsQuery.isPending)
+    return <LoadingState text="正在加载岗位数据…" />;
 
   return (
     <>
@@ -256,14 +326,28 @@ export function JobTable() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={`${row[0]}-${row[1]}`}>
-                  {row.map((value, index) => (
-                    <td key={`${row[0]}-${index}`}>{value}</td>
-                  ))}
+                <tr key={row.id}>
+                  <td>{row.title}</td>
+                  <td>{row.company}</td>
+                  <td>{row.category}</td>
+                  <td>{row.city}</td>
+                  <td>{row.education}</td>
+                  <td>{row.deadline}</td>
                   <td>
                     <button
-                      aria-label={`收藏岗位：${row[0]}`}
-                      className="rounded-md p-1 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400"
+                      aria-label={`${favoriteIds.has(row.id) ? "取消收藏" : "收藏岗位"}：${row.title}`}
+                      className={`rounded-md p-1 ${favoriteIds.has(row.id) ? "text-teal-600" : "text-slate-400 hover:text-teal-600"}`}
+                      disabled={
+                        !authenticated ||
+                        row.id < 0 ||
+                        favoriteMutation.isPending
+                      }
+                      onClick={() =>
+                        favoriteMutation.mutate({
+                          jobId: row.id,
+                          active: favoriteIds.has(row.id),
+                        })
+                      }
                       type="button"
                     >
                       <Bookmark aria-hidden="true" size={18} />

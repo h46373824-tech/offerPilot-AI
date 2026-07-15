@@ -60,7 +60,7 @@ frontend/src/
 - **Tailwind CSS** 提供响应式样式和主题样式。
 - `apiFetch` 统一读取 `NEXT_PUBLIC_API_URL`，在浏览器请求中附加 Bearer Token，并把非 2xx 响应转换为可显示错误。
 
-第一阶段部分业务视图使用静态 Demo 展示数据验证信息架构；认证流程连接真实 API。后续应逐页替换为 TanStack Query 驱动的 API 数据，并保留加载、空数据和错误状态。
+第二阶段核心业务视图已经由 TanStack Query 驱动 API 数据；未登录的企业与岗位页保留明确标记的静态 Demo 降级展示。写操作完成后按资源 query key 失效缓存，并保留加载、空数据、错误和登录要求状态。
 
 ### 4.2 后端
 
@@ -89,7 +89,7 @@ backend/app/
 5. response model 过滤并序列化输出；
 6. FastAPI 自动生成 `/openapi.json`、`/docs` 和 `/redoc`。
 
-当前路由按资源分为 `auth`、`companies`、`jobs`、`favorites`、`applications`、`interviews`、`offers`、`notifications` 和 `dashboard`。当业务规则变复杂时，应把路由中的查询与事务逐步下沉到 service/repository 层，避免路由函数膨胀。
+当前路由按资源分为 `auth`、`companies`、`jobs`、`favorites`、`applications`、`interviews`、`offers`、`notifications`、`resumes`、`job_alerts`、`activity` 和 `dashboard`。第二阶段新增 service 层承载附件存储、提醒生成和审计写入；更复杂的查询可继续下沉到 repository 层。
 
 ### 4.3 数据层
 
@@ -185,6 +185,8 @@ Dashboard 在单次请求中计算：
 - `CORS_ORIGINS`
 - `ACCESS_TOKEN_EXPIRE_MINUTES`（采用默认值时为 1440 分钟）
 - `API_V1_PREFIX`（采用默认值时为 `/api/v1`）
+- `UPLOAD_DIR`（本地附件目录）
+- `MAX_UPLOAD_BYTES`（附件大小上限）
 
 前端构建期公开变量为 `NEXT_PUBLIC_API_URL`。带 `NEXT_PUBLIC_` 前缀的变量会进入浏览器代码，不得包含密钥。
 
@@ -224,7 +226,8 @@ Docker Compose 通过服务名 `postgres` 和 `redis` 进行容器网络解析�
 GitHub Actions 在 `dev`、`main` push 和 Pull Request 上运行：
 
 - 前端：`npm ci`、ESLint、TypeScript 和生产构建；
-- 后端：安装开发依赖、Ruff lint、mypy 和 pytest；
+- 后端：安装开发依赖、Ruff lint/format、mypy、SQLite API 测试和 PostgreSQL 集成测试；
+- E2E：构建完整 Compose 环境并运行 Playwright Chromium 关键路径；
 - 测试环境使用独立数据库配置，不读取开发密钥。
 
 Prettier 和 `ruff format --check` 是提交前的本地检查；若团队希望将格式作为服务端强制门禁，可在 CI 中加入对应命令。

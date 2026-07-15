@@ -238,7 +238,7 @@ erDiagram
 | `created_at` | Timestamptz | 否 | 创建时间 |
 | `updated_at` | Timestamptz | 否 | 更新时间 |
 
-第一阶段 API 支持分页读取、单条标记已读和全部标记已读；通知生成与外部发送属于后续任务系统。
+第二阶段支持按当前用户生成岗位截止、48 小时内面试和 3 天内 Offer 决策提醒，并使用关联资源字段去重。外部消息发送与后台定时调度仍属于后续任务系统。
 
 ### 4.9 `resumes`
 
@@ -250,10 +250,15 @@ erDiagram
 | `file_url` | String(500) | 否 | 文件位置，不应暴露永久公开 URL |
 | `version` | String(50) | 是 | 版本标签 |
 | `is_default` | Boolean | 否 | 默认简历标记 |
+| `original_filename` | String(255) | 否 | 上传时原始文件名 |
+| `content_type` | String(100) | 否 | 已校验的 MIME 类型 |
+| `file_size` | Integer | 否 | 文件字节数 |
+| `storage_key` | String(500) | 否 | 唯一内部存储键 |
+| `checksum_sha256` | String(64) | 否 | 文件完整性摘要 |
 | `created_at` | Timestamptz | 否 | 创建时间 |
 | `updated_at` | Timestamptz | 否 | 更新时间 |
 
-第一阶段建立模型但尚未提供文件上传 API。生产实现需增加对象存储、短期签名 URL、文件类型/大小校验、恶意文件扫描、加密和删除机制。
+第二阶段提供受认证的上传、下载、版本更新、默认简历和删除 API，并可由投递记录通过 `resume_id` 关联。当前文件保存在 Docker 持久卷；生产实现仍需对象存储、短期签名 URL、恶意文件扫描和静态加密。
 
 ### 4.10 `job_alerts`
 
@@ -264,6 +269,9 @@ erDiagram
 | `name` | String(200) | 否 | 订阅名称 |
 | `criteria` | JSON | 否 | 城市、行业、学历等筛选条件 |
 | `is_active` | Boolean | 否 | 是否启用 |
+| `frequency` | String(20) | 否 | `instant`、`daily` 或 `weekly` |
+| `last_run_at` | Timestamptz | 是 | 最近匹配时间 |
+| `next_run_at` | Timestamptz | 是 | 下次建议运行时间 |
 | `created_at` | Timestamptz | 否 | 创建时间 |
 | `updated_at` | Timestamptz | 否 | 更新时间 |
 
@@ -281,7 +289,7 @@ erDiagram
 | `details` | JSON | 是 | 最小化的变更摘要 |
 | `created_at` | Timestamptz | 否 | 创建时间，带索引 |
 
-审计日志不应包含密码、Token、简历全文或完整 Offer 敏感内容。第一阶段建立模型，完整审计写入策略属于后续工作。
+审计日志不应包含密码、Token、简历全文或完整 Offer 敏感内容。第二阶段已对个人资料、收藏、简历、投递、面试和 Offer 关键写操作记录最小化摘要。
 
 ## 5. 删除策略
 

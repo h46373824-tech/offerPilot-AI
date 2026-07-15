@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str = "redis://redis:6379/0"
     cors_origins: str = "http://localhost:3000"
+    upload_dir: str = "data/uploads"
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
 
     @property
     def cors_origin_list(self) -> list[str]:

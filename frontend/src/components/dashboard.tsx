@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
   Area,
   AreaChart,
@@ -24,7 +25,11 @@ import {
   Users,
 } from "lucide-react";
 import { applications } from "@/data/demo";
-const metrics = [
+import { ErrorState, LoadingState } from "@/components/status";
+import { apiFetch } from "@/lib/api";
+import { useHasToken } from "@/lib/auth";
+import type { DashboardStats } from "@/lib/types";
+const demoMetrics = [
   ["已开放企业数", "30", Building2, "text-blue-600 bg-blue-50"],
   ["专科可投企业数", "12", GraduationCap, "text-violet-600 bg-violet-50"],
   ["本科可投企业数", "28", Users, "text-teal-600 bg-teal-50"],
@@ -52,6 +57,93 @@ const industry = [
 ];
 const colors = ["#0f766e", "#2563eb", "#7c3aed", "#d97706", "#64748b"];
 export function DashboardView() {
+  const authenticated = useHasToken();
+  const statsQuery = useQuery({
+    enabled: authenticated,
+    queryKey: ["dashboard", "stats"],
+    queryFn: () => apiFetch<DashboardStats>("/dashboard/stats"),
+  });
+  if (authenticated && statsQuery.isPending)
+    return <LoadingState text="正在汇总求职数据…" />;
+  if (authenticated && statsQuery.isError)
+    return (
+      <ErrorState
+        action={
+          <button
+            className="btn-primary"
+            onClick={() => void statsQuery.refetch()}
+            type="button"
+          >
+            重新加载
+          </button>
+        }
+        text={statsQuery.error.message}
+      />
+    );
+  const stats = statsQuery.data;
+  const metrics = stats
+    ? ([
+        [
+          "已开放企业数",
+          String(stats.open_companies),
+          Building2,
+          "text-blue-600 bg-blue-50",
+        ],
+        [
+          "专科可投企业数",
+          String(stats.college_companies),
+          GraduationCap,
+          "text-violet-600 bg-violet-50",
+        ],
+        [
+          "本科可投企业数",
+          String(stats.bachelor_companies),
+          Users,
+          "text-teal-600 bg-teal-50",
+        ],
+        [
+          "今日新增岗位数",
+          String(stats.new_jobs_today),
+          Sparkles,
+          "text-amber-600 bg-amber-50",
+        ],
+        [
+          "已投递数量",
+          String(stats.applications),
+          FileCheck2,
+          "text-cyan-600 bg-cyan-50",
+        ],
+        [
+          "面试数量",
+          String(stats.interviews),
+          Handshake,
+          "text-fuchsia-600 bg-fuchsia-50",
+        ],
+        [
+          "Offer 数量",
+          String(stats.offers),
+          Trophy,
+          "text-emerald-600 bg-emerald-50",
+        ],
+        [
+          "即将截止岗位",
+          String(stats.expiring_jobs),
+          CalendarClock,
+          "text-rose-600 bg-rose-50",
+        ],
+      ] as const)
+    : demoMetrics;
+  const trendData =
+    stats?.application_trend.map((point) => ({
+      d: point.date.slice(5),
+      v: point.count,
+    })) ?? trend;
+  const industryData =
+    stats?.industry_distribution.map((item) => ({
+      n: item.industry,
+      v: item.count,
+    })) ?? industry;
+  const recent = stats?.recent_applications;
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -73,7 +165,7 @@ export function DashboardView() {
           <p className="mb-4 text-xs text-[var(--muted)]">近 7 天投递数量</p>
           <div aria-label="近 7 天投递趋势图" className="h-72" role="img">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trend}>
+              <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0f766e" stopOpacity={0.4} />
@@ -105,14 +197,14 @@ export function DashboardView() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={industry}
+                  data={industryData}
                   dataKey="v"
                   nameKey="n"
                   innerRadius={55}
                   outerRadius={85}
                   paddingAngle={3}
                 >
-                  {industry.map((x, i) => (
+                  {industryData.map((x, i) => (
                     <Cell key={x.n} fill={colors[i]} />
                   ))}
                 </Pie>
@@ -146,21 +238,34 @@ export function DashboardView() {
               </tr>
             </thead>
             <tbody>
-              {applications.map((r) => (
-                <tr key={r[0] + r[1]}>
-                  {r.map((v, i) => (
-                    <td key={v}>
-                      {i === 2 ? (
+              {recent
+                ? recent.map((record) => (
+                    <tr key={record.id}>
+                      <td>{record.company_name}</td>
+                      <td>{record.job_title}</td>
+                      <td>
                         <span className="rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700 dark:bg-teal-950 dark:text-teal-300">
-                          {v}
+                          {record.status}
                         </span>
-                      ) : (
-                        v
-                      )}
-                    </td>
+                      </td>
+                      <td>{record.applied_at?.slice(0, 10) ?? "未记录"}</td>
+                    </tr>
+                  ))
+                : applications.map((record) => (
+                    <tr key={record[0] + record[1]}>
+                      {record.map((value, index) => (
+                        <td key={value}>
+                          {index === 2 ? (
+                            <span className="rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700 dark:bg-teal-950 dark:text-teal-300">
+                              {value}
+                            </span>
+                          ) : (
+                            value
+                          )}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>

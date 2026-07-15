@@ -1,4 +1,4 @@
-const API_URL =
+export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 type ApiErrorBody = {
@@ -49,4 +49,18 @@ export async function apiFetch<T>(
   if (response.status === 204) return undefined as T;
 
   return response.json() as Promise<T>;
+}
+
+export async function apiDownload(path: string, filename: string) {
+  const token = window.localStorage.getItem("access_token");
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error("文件下载失败");
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

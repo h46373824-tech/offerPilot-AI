@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from app.api.deps import CurrentUser, Db
 from app.models import Favorite, Job
 from app.schemas import FavoriteCreate, FavoriteOut, Page
+from app.services.audit import record_audit
 
 router = APIRouter(prefix="/favorites", tags=["收藏"])
 
@@ -47,6 +48,15 @@ def add_favorite(payload: FavoriteCreate, db: Db, user: CurrentUser) -> Favorite
 
     item = Favorite(user_id=user.id, job_id=payload.job_id)
     db.add(item)
+    db.flush()
+    record_audit(
+        db,
+        user_id=user.id,
+        action="favorite.created",
+        entity_type="favorite",
+        entity_id=item.id,
+        details={"job_id": item.job_id},
+    )
     db.commit()
     db.refresh(item)
     return item
@@ -57,5 +67,13 @@ def remove_favorite(job_id: int, db: Db, user: CurrentUser) -> None:
     item = db.scalar(select(Favorite).where(Favorite.user_id == user.id, Favorite.job_id == job_id))
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="收藏不存在")
+    record_audit(
+        db,
+        user_id=user.id,
+        action="favorite.deleted",
+        entity_type="favorite",
+        entity_id=item.id,
+        details={"job_id": item.job_id},
+    )
     db.delete(item)
     db.commit()

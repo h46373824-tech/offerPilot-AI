@@ -45,7 +45,21 @@ class UserOut(BaseModel):
     email: EmailStr
     full_name: str
     is_active: bool
+    graduation_year: int | None
+    education_level: str | None
+    target_cities: str | None
+    notifications_enabled: bool
     created_at: datetime
+
+
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=100)
+    graduation_year: int | None = Field(default=None, ge=2024, le=2100)
+    education_level: str | None = Field(default=None, max_length=50)
+    target_cities: str | None = Field(default=None, max_length=500)
+    notifications_enabled: bool | None = None
 
 
 class CompanyBase(BaseModel):
@@ -220,6 +234,7 @@ class ApplicationCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     job_id: int = Field(gt=0)
+    resume_id: int | None = Field(default=None, gt=0)
     status: str = Field(default="planned", min_length=1, max_length=50)
     applied_at: datetime | None = None
     channel: str | None = Field(default=None, max_length=100)
@@ -230,6 +245,7 @@ class ApplicationUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     status: str | None = Field(default=None, min_length=1, max_length=50)
+    resume_id: int | None = Field(default=None, gt=0)
     applied_at: datetime | None = None
     channel: str | None = Field(default=None, max_length=100)
     notes: str | None = None
@@ -351,7 +367,82 @@ class NotificationOut(BaseModel):
     content: str
     notification_type: str
     is_read: bool
+    related_entity_type: str | None
+    related_entity_id: int | None
+    scheduled_for: datetime | None
     created_at: datetime
+
+
+class ResumeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    name: str
+    file_url: str
+    version: str | None
+    is_default: bool
+    original_filename: str
+    content_type: str
+    file_size: int
+    checksum_sha256: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ResumeUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    version: str | None = Field(default=None, max_length=50)
+    is_default: bool | None = None
+
+
+class JobAlertCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=200)
+    criteria: dict[str, object] = Field(default_factory=dict)
+    frequency: str = Field(default="daily", pattern="^(daily|weekly|instant)$")
+    is_active: bool = True
+
+
+class JobAlertUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    criteria: dict[str, object] | None = None
+    frequency: str | None = Field(default=None, pattern="^(daily|weekly|instant)$")
+    is_active: bool | None = None
+
+
+class JobAlertOut(JobAlertCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    last_run_at: datetime | None
+    next_run_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    action: str
+    entity_type: str
+    entity_id: int | None
+    details: dict[str, object] | None
+    created_at: datetime
+
+
+class ReminderRunResult(BaseModel):
+    created: int = Field(ge=0)
+    job_deadlines: int = Field(ge=0)
+    interviews: int = Field(ge=0)
+    offers: int = Field(ge=0)
 
 
 class ApplicationTrendPoint(BaseModel):

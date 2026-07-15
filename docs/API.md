@@ -418,9 +418,43 @@ GET /api/v1/notifications?unread_only=true
 }
 ```
 
-第一阶段不开放客户端创建通知接口，通知生成和外部发送属于后续任务系统。
+客户端不能直接创建任意通知。第二阶段由提醒和岗位订阅接口生成通知；外部消息发送与后台定时调度属于后续任务系统。
 
-## 12. Dashboard
+## 12. 简历
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/resumes` | 当前用户简历列表 |
+| POST | `/api/v1/resumes` | `multipart/form-data` 上传简历 |
+| GET | `/api/v1/resumes/{id}` | 简历元数据 |
+| GET | `/api/v1/resumes/{id}/download` | 下载附件 |
+| PATCH | `/api/v1/resumes/{id}` | 修改名称、版本或默认状态 |
+| POST | `/api/v1/resumes/{id}/default` | 设为默认简历 |
+| DELETE | `/api/v1/resumes/{id}` | 删除元数据与附件 |
+
+上传字段为 `file`、`name`、可选 `version` 和 `is_default`。仅允许 PDF、DOC、DOCX，默认最大 10 MB；附件使用不可预测的内部存储键，下载前会验证资源归属。投递的 `resume_id` 只能关联当前用户的简历。
+
+## 13. 岗位订阅
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET/POST | `/api/v1/job-alerts` | 列表/创建订阅 |
+| GET/PATCH/DELETE | `/api/v1/job-alerts/{id}` | 详情/更新/删除 |
+| GET | `/api/v1/job-alerts/{id}/preview` | 预览匹配岗位 |
+| POST | `/api/v1/job-alerts/{id}/run` | 执行匹配并生成通知 |
+
+`criteria` 支持 `keyword`、`city`、`category`、`education`、`industry`，`frequency` 为 `instant`、`daily` 或 `weekly`。运行结果只将 `is_demo=false`、已核验且开放的岗位生成通知，Demo 岗位可用于界面浏览但不会被包装成实时匹配结果。
+
+## 14. 提醒与审计
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/v1/reminders/run` | 为当前用户检查并生成提醒 |
+| GET | `/api/v1/audit-logs` | 当前用户关键操作日志分页列表 |
+
+提醒覆盖收藏岗位截止、48 小时内面试和 3 天内 Offer 决策截止，并按关联资源去重。审计详情只保存最小化动作摘要，不返回密码、Token 或简历正文。
+
+## 15. Dashboard
 
 `GET /api/v1/dashboard/stats`
 
@@ -466,7 +500,7 @@ GET /api/v1/notifications?unread_only=true
 
 种子企业是 Demo 数据，因此 `open_companies` 不能解释为真实开放企业数。
 
-## 13. curl 示例
+## 16. curl 示例
 
 注册并保存返回的 Token 后：
 
@@ -489,7 +523,7 @@ Invoke-RestMethod `
   -Headers @{ Authorization = "Bearer $token" }
 ```
 
-## 14. 兼容性与演进
+## 17. 兼容性与演进
 
 - 新增可选字段通常可以保持 v1 兼容；
 - 删除字段、改名、改变类型或状态语义需要新版本或明确迁移期；

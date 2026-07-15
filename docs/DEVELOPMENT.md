@@ -263,15 +263,30 @@ python -m app.db.seed
 
 测试默认使用隔离 SQLite 数据库，快速但不能覆盖全部 PostgreSQL 语义。涉及大小写搜索、JSON、并发、约束或迁移的功能应补 PostgreSQL 集成测试。
 
+运行第二阶段 PostgreSQL 集成测试：
+
+```bash
+TEST_POSTGRES_URL=postgresql+psycopg://user:password@localhost:5432/test_db \
+  pytest tests/integration -m integration
+```
+
 ### 7.2 前端测试
 
-第一阶段以 lint、类型检查和生产构建为基础门禁。后续优先补充：
+第二阶段已加入 Playwright 关键路径；继续优先补充：
 
 - API 客户端与错误映射单元测试；
 - 登录/注册表单交互测试；
 - 搜索、筛选、分页和空状态组件测试；
-- Playwright 关键路径：注册 → 浏览 → 收藏/投递 → Dashboard；
+- Playwright 关键路径：注册 → Dashboard → 岗位订阅，以及移动端 Demo 浏览与导航；
 - 深色模式、移动导航与可访问性检查。
+
+运行 E2E（先启动 `docker compose up --build -d --wait`）：
+
+```bash
+cd frontend
+npx playwright install chromium
+npm run test:e2e -- --project=chromium
+```
 
 ### 7.3 手工冒烟
 
@@ -313,7 +328,7 @@ git commit -m "type: concise description"
 
 ## 9. CI
 
-`.github/workflows/ci.yml` 对 `dev`、`main` push 和 Pull Request 运行。CI 使用 Node.js 22、Python 3.12；前端执行 lint、类型检查和生产构建，后端执行 Ruff lint、mypy 和 pytest。Prettier 与 `ruff format --check` 当前作为提交前本地检查，后续可加入 CI 强制门禁。
+`.github/workflows/ci.yml` 对 `dev`、`main` push 和 Pull Request 运行。CI 使用 Node.js 22、Python 3.12；前端执行 lint、类型检查和生产构建，后端执行 Ruff、mypy、SQLite API 测试与 PostgreSQL 17 集成测试，随后完整构建 Compose 并执行 Playwright Chromium E2E。Prettier 仍作为提交前本地检查。
 
 CI 失败时先在对应子目录复现单个命令。不要通过移除规则、全局 ignore 或降低 TypeScript/mypy 严格度来绕过问题。
 

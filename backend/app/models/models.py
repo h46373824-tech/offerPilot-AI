@@ -33,6 +33,10 @@ class User(TimestampMixin, Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    graduation_year: Mapped[int | None]
+    education_level: Mapped[str | None] = mapped_column(String(50))
+    target_cities: Mapped[str | None] = mapped_column(String(500))
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Company(TimestampMixin, Base):
@@ -94,6 +98,9 @@ class Application(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    resume_id: Mapped[int | None] = mapped_column(
+        ForeignKey("resumes.id", ondelete="SET NULL"), index=True
+    )
     status: Mapped[str] = mapped_column(String(50), default="planned", index=True)
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     channel: Mapped[str | None] = mapped_column(String(100))
@@ -137,6 +144,9 @@ class Notification(TimestampMixin, Base):
     content: Mapped[str] = mapped_column(Text)
     notification_type: Mapped[str] = mapped_column(String(50))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    related_entity_type: Mapped[str | None] = mapped_column(String(50))
+    related_entity_id: Mapped[int | None]
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class Resume(TimestampMixin, Base):
@@ -147,6 +157,11 @@ class Resume(TimestampMixin, Base):
     file_url: Mapped[str] = mapped_column(String(500))
     version: Mapped[str | None] = mapped_column(String(50))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    original_filename: Mapped[str] = mapped_column(String(255), default="resume.pdf")
+    content_type: Mapped[str] = mapped_column(String(100), default="application/pdf")
+    file_size: Mapped[int] = mapped_column(default=0)
+    storage_key: Mapped[str] = mapped_column(String(500), unique=True)
+    checksum_sha256: Mapped[str] = mapped_column(String(64))
 
 
 class JobAlert(TimestampMixin, Base):
@@ -156,6 +171,9 @@ class JobAlert(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200))
     criteria: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    frequency: Mapped[str] = mapped_column(String(30), default="daily")
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class AuditLog(Base):
