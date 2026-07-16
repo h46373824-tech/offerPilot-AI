@@ -24,6 +24,7 @@
 
 - 保留空的 `frontend/public` 目录，确保干净检出后 Docker 构建成功。
 - 初始 Alembic 迁移改为确定性 schema，确保全新数据库可依次升级到 `0004`。
+- 将 TypeScript 保持在 Next.js ESLint 工具链兼容的 5.9 系列，修复依赖自动更新导致的 CI 失败。
 
 ### Security
 
