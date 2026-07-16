@@ -44,6 +44,33 @@ def test_parsers_extract_official_links() -> None:
     assert rss_items[0].title == "AI Engineer"
     assert rss_items[0].published_at == datetime(2026, 7, 15, 8, tzinfo=UTC)
 
+    baidu = b"""<script>window.__INITIAL_DATA__ ={
+      "listData":{"listDetailData":[{
+        "name":"2027AIDU-Agent Engineer(J1)",
+        "postId":"11111111-2222-3333-4444-555555555555",
+        "postType":"Technology",
+        "publishDate":"2026-07-16",
+        "workPlace":"Beijing",
+        "workContent":"Build agents",
+        "serviceCondition":"Computer science"
+      }]},"unused":undefined}; window.prefix="/jobs";</script>"""
+    baidu_items = official_crawler.parse_baidu_ssr(
+        baidu, "https://talent.baidu.com/jobs/list?recruitType=GRADUATE"
+    )
+    assert baidu_items == [
+        DiscoveredJob(
+            title="2027AIDU-Agent Engineer(J1)",
+            application_url=(
+                "https://talent.baidu.com/jobs/detail/GRADUATE/11111111-2222-3333-4444-555555555555"
+            ),
+            published_at=datetime(2026, 7, 16, tzinfo=UTC),
+            category="Technology",
+            work_cities="Beijing",
+            description="Build agents",
+            requirements="Computer science",
+        )
+    ]
+
 
 def test_crawler_rejects_private_network_targets() -> None:
     with pytest.raises(CrawlError, match="内网"):
@@ -74,7 +101,7 @@ def test_admin_can_sync_discovered_job_and_link(
             "source_type": "official_recruitment",
             "authorization_note": "企业官方测试来源，已确认允许用于本地自动化测试",
             "company_id": company.json()["id"],
-            "feed_url": "https://careers.example.com/jobs",
+            "feed_url": "https://talent.baidu.com/jobs/list?recruitType=GRADUATE",
             "parser_mode": "html_links",
             "is_crawl_enabled": True,
             "crawl_interval_minutes": 60,
@@ -111,3 +138,64 @@ def test_admin_can_sync_discovered_job_and_link(
     )
     assert second_run.json()["discovered_rows"] == 0
     assert second_run.json()["skipped_rows"] == 1
+
+
+def test_trusted_official_adapter_publishes_structured_job(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = register_admin(client)
+    company = client.post(
+        "/api/v1/companies",
+        headers=headers,
+        json={
+            "name": "可信适配器测试企业",
+            "industry": "人工智能",
+            "company_type": "测试",
+            "education_requirement": "官网为准",
+            "work_cities": "北京",
+        },
+    )
+    source = client.post(
+        "/api/v1/admin/data-sources",
+        headers=headers,
+        json={
+            "name": "可信官方适配器",
+            "source_type": "trusted_official_adapter",
+            "authorization_note": "企业官网结构化校招列表测试",
+            "company_id": company.json()["id"],
+            "feed_url": "https://talent.baidu.com/jobs/list?recruitType=GRADUATE",
+            "parser_mode": "baidu_ssr",
+            "is_crawl_enabled": True,
+            "crawl_interval_minutes": 1440,
+        },
+    )
+    monkeypatch.setattr(
+        official_crawler,
+        "_discover",
+        lambda _source: [
+            DiscoveredJob(
+                title="2027 结构化官方岗位",
+                application_url=(
+                    "https://talent.baidu.com/jobs/detail/GRADUATE/"
+                    "11111111-2222-3333-4444-555555555555"
+                ),
+                category="技术",
+                work_cities="北京",
+                description="官方职责",
+                requirements="官方要求",
+            )
+        ],
+    )
+    monkeypatch.setattr(official_crawler, "validate_public_url", lambda _url: None)
+
+    run = client.post(f"/api/v1/admin/data-sources/{source.json()['id']}/crawl", headers=headers)
+    jobs = client.get(
+        "/api/v1/jobs",
+        params={"search": "结构化官方岗位", "verified_only": True},
+    )
+
+    assert run.status_code == 200
+    assert jobs.status_code == 200
+    assert jobs.json()["total"] == 1
+    assert jobs.json()["items"][0]["recruitment_status"] == "open"
+    assert jobs.json()["items"][0]["last_verified_at"] is not None

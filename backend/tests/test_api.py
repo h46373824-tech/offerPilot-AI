@@ -391,7 +391,7 @@ def test_official_launch_seed_is_idempotent_and_traceable(client: TestClient) ->
         )
 
     assert len(official_companies) == 14
-    assert len(official_jobs) == 23
+    assert len(official_jobs) == 30
     assert all(item.data_source.endswith("官方招聘来源") for item in official_companies)
     assert all(item.application_url and item.data_source_id for item in official_jobs)
 

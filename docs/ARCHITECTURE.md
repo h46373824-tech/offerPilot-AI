@@ -92,7 +92,7 @@ backend/app/
 
 当前路由按资源分为 `auth`、`companies`、`jobs`、`favorites`、`applications`、`interviews`、`offers`、`notifications`、`resumes`、`job_alerts`、`activity` 和 `dashboard`。第二阶段新增 service 层承载附件存储、提醒生成和审计写入；更复杂的查询可继续下沉到 repository 层。
 
-第四阶段在 FastAPI lifespan 中启动单进程本地调度循环。循环只查询到期且启用的数据源，通过独立数据库 Session 运行同步；解析器位于 `services/official_crawler.py`。URL 在请求及重定向时进行公网校验，robots.txt、超时、响应大小和每批条数均为硬限制。该设计适合 Compose 中的单个 Uvicorn 实例；扩展为多实例前必须迁移到带分布式锁的任务队列。
+第四阶段在 FastAPI lifespan 中启动单进程本地调度循环。循环只查询到期且启用的数据源，通过独立数据库 Session 运行同步；解析器位于 `services/official_crawler.py`。通用 HTML/RSS/JSON 解析结果仍需人工核验；只有代码内置且限定官方域名的 `trusted_official_adapter` 可直接刷新开放状态和核验时间。URL 在请求及重定向时进行公网校验，robots.txt、超时、响应大小和每批条数均为硬限制。该设计适合 Compose 中的单个 Uvicorn 实例；扩展为多实例前必须迁移到带分布式锁的任务队列。
 
 ### 4.3 数据层
 

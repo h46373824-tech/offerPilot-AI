@@ -12,7 +12,9 @@
 
 ## 2. 内置数据声明
 
-仓库包含两类目的不同的数据：30 家/60 个开发 Demo，以及 2026-07-16 人工核验的 14 家企业、23 个正式招聘项目或岗位。正式基线的溯源清单位于 `database/official-recruitment-2026-07-16.csv`，并由 `python -m app.db.seed_official` 幂等写入。
+仓库包含两类目的不同的数据：30 家/60 个开发 Demo，以及 2026-07-16 人工核验的 14 家企业、30 个正式招聘项目或岗位。正式基线的溯源清单位于 `database/official-recruitment-2026-07-16.csv`，并由 `python -m app.db.seed_official` 幂等写入。
+
+百度官方校招页使用专用结构化适配器每 24 小时低频检查一次。只有 `source_type=trusted_official_adapter` 且结构通过专用解析的岗位可自动刷新核验时间；通用 HTML/RSS/JSON 发现仍进入待核验队列。
 
 Demo 数据用于开发、测试和 UI 演示：
 

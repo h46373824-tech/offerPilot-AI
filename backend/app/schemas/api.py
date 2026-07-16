@@ -74,7 +74,7 @@ class DataSourceBase(BaseModel):
     is_active: bool = True
     company_id: int | None = Field(default=None, gt=0)
     feed_url: str | None = Field(default=None, max_length=1000)
-    parser_mode: Literal["auto", "html_links", "rss", "atom", "json_feed"] = "auto"
+    parser_mode: Literal["auto", "html_links", "rss", "atom", "json_feed", "baidu_ssr"] = "auto"
     link_keywords: list[str] = Field(default_factory=list, max_length=30)
     is_crawl_enabled: bool = False
     crawl_interval_minutes: int = Field(default=360, ge=15, le=10080)
@@ -108,7 +108,9 @@ class DataSourceUpdate(BaseModel):
     is_active: bool | None = None
     company_id: int | None = Field(default=None, gt=0)
     feed_url: str | None = Field(default=None, max_length=1000)
-    parser_mode: Literal["auto", "html_links", "rss", "atom", "json_feed"] | None = None
+    parser_mode: Literal["auto", "html_links", "rss", "atom", "json_feed", "baidu_ssr"] | None = (
+        None
+    )
     link_keywords: list[str] | None = Field(default=None, max_length=30)
     is_crawl_enabled: bool | None = None
     crawl_interval_minutes: int | None = Field(default=None, ge=15, le=10080)

@@ -42,6 +42,10 @@ class DiscoveredJob:
     title: str
     application_url: str
     published_at: datetime | None = None
+    category: str | None = None
+    work_cities: str | None = None
+    description: str | None = None
+    requirements: str | None = None
 
 
 class _RecruitmentLinkParser(HTMLParser):
@@ -237,6 +241,69 @@ def parse_json_feed(content: bytes, base_url: str) -> list[DiscoveredJob]:
     return results
 
 
+def parse_baidu_ssr(content: bytes, base_url: str) -> list[DiscoveredJob]:
+    """Parse Baidu Talent's public server-rendered graduate job payload."""
+    if urlparse(base_url).hostname != "talent.baidu.com":
+        raise CrawlError("百度官方适配器仅允许 talent.baidu.com")
+    text = content.decode("utf-8", errors="replace")
+    marker = "window.__INITIAL_DATA__ ="
+    start = text.find(marker)
+    if start < 0:
+        raise CrawlError("百度官方招聘页缺少初始数据")
+    start += len(marker)
+    end = text.find("; window.prefix", start)
+    if end < 0:
+        raise CrawlError("百度官方招聘页数据边界无效")
+    raw = text[start:end].strip().replace(":undefined", ":null")
+    try:
+        payload = json.loads(raw)
+        items = payload["listData"]["listDetailData"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise CrawlError("百度官方招聘页数据格式无效") from exc
+    if not isinstance(items, list):
+        raise CrawlError("百度官方招聘页岗位列表无效")
+
+    results: list[DiscoveredJob] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("name")
+        post_id = item.get("postId")
+        if not isinstance(title, str) or not isinstance(post_id, str):
+            continue
+        results.append(
+            DiscoveredJob(
+                title=title.strip()[:200],
+                application_url=urljoin(base_url, f"/jobs/detail/GRADUATE/{post_id.strip()}"),
+                published_at=_parse_date(
+                    item.get("publishDate") if isinstance(item.get("publishDate"), str) else None
+                ),
+                category=(
+                    item["postType"].strip()[:100]
+                    if isinstance(item.get("postType"), str) and item["postType"].strip()
+                    else None
+                ),
+                work_cities=(
+                    item["workPlace"].strip()[:500]
+                    if isinstance(item.get("workPlace"), str) and item["workPlace"].strip()
+                    else None
+                ),
+                description=(
+                    item["workContent"].strip()
+                    if isinstance(item.get("workContent"), str) and item["workContent"].strip()
+                    else None
+                ),
+                requirements=(
+                    item["serviceCondition"].strip()
+                    if isinstance(item.get("serviceCondition"), str)
+                    and item["serviceCondition"].strip()
+                    else None
+                ),
+            )
+        )
+    return results
+
+
 def _discover(source: DataSource) -> list[DiscoveredJob]:
     if not source.feed_url:
         raise CrawlError("未配置官方招聘源地址")
@@ -253,6 +320,8 @@ def _discover(source: DataSource) -> list[DiscoveredJob]:
             mode = "rss"
     if mode == "html_links":
         return parse_html_links(content, final_url, source.link_keywords or DEFAULT_KEYWORDS)
+    if mode == "baidu_ssr":
+        return parse_baidu_ssr(content, final_url)
     if mode == "json_feed":
         return parse_json_feed(content, final_url)
     return parse_xml_feed(content, final_url)
@@ -267,6 +336,13 @@ def ingest_discoveries(
     if company is None:
         raise CrawlError("绑定企业不存在")
     created = updated = skipped = 0
+    verified_at = datetime.now(UTC)
+    trusted_adapter = (
+        source.source_type == "trusted_official_adapter"
+        and source.parser_mode == "baidu_ssr"
+        and source.feed_url is not None
+        and urlparse(source.feed_url).hostname == "talent.baidu.com"
+    )
     for discovery in discoveries[: settings.crawler_max_items_per_run]:
         try:
             validate_public_url(discovery.application_url)
@@ -293,7 +369,20 @@ def ingest_discoveries(
             existing.application_url = discovery.application_url
             existing.data_source = source.name
             existing.data_source_id = source.id
-            if changed:
+            for field, value in (
+                ("category", discovery.category),
+                ("work_cities", discovery.work_cities),
+                ("description", discovery.description),
+                ("requirements", discovery.requirements),
+            ):
+                if value and getattr(existing, field) != value:
+                    setattr(existing, field, value)
+                    changed = True
+            if trusted_adapter:
+                existing.last_verified_at = verified_at
+                existing.recruitment_status = "open"
+                updated += 1
+            elif changed:
                 existing.last_verified_at = None
                 existing.recruitment_status = "unverified"
                 updated += 1
@@ -304,17 +393,18 @@ def ingest_discoveries(
             Job(
                 title=discovery.title,
                 company_id=company.id,
-                category="待核验",
-                work_cities="待核验",
+                category=discovery.category or "待核验",
+                work_cities=discovery.work_cities or "待核验",
                 education_requirement="待核验",
-                description="自动同步发现，详情请访问官方投递页面并由管理员核验。",
-                requirements="待核验",
+                description=discovery.description
+                or "自动同步发现，详情请访问官方投递页面并由管理员核验。",
+                requirements=discovery.requirements or "待核验",
                 application_url=discovery.application_url,
                 published_at=discovery.published_at,
-                recruitment_status="unverified",
+                recruitment_status="open" if trusted_adapter else "unverified",
                 data_source=source.name,
                 data_source_id=source.id,
-                last_verified_at=None,
+                last_verified_at=verified_at if trusted_adapter else None,
                 is_demo=False,
             )
         )

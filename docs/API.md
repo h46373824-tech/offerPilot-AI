@@ -476,7 +476,7 @@ GET /api/v1/notifications?unread_only=true
 
 本地管理员可通过 `ADMIN_EMAILS` 在首次注册时授予，或运行 `python -m app.db.promote_admin <email>` 提升已有账号。
 
-官方来源还可设置 `company_id`、`feed_url`、`parser_mode`、`link_keywords`、`is_crawl_enabled` 和 `crawl_interval_minutes`。启用同步必须绑定企业并提供官方 URL，间隔最短 15 分钟。同步响应包含 `status`、`discovered_rows`、`updated_rows`、`skipped_rows` 和 `error_message`；自动发现岗位始终以 `unverified`、`last_verified_at=null` 写入，其 `application_url` 由官方来源提供。
+官方来源还可设置 `company_id`、`feed_url`、`parser_mode`、`link_keywords`、`is_crawl_enabled` 和 `crawl_interval_minutes`。启用同步必须绑定企业并提供官方 URL，间隔最短 15 分钟。同步响应包含 `status`、`discovered_rows`、`updated_rows`、`skipped_rows` 和 `error_message`。通用解析发现的岗位以 `unverified`、`last_verified_at=null` 写入；只有维护者编写并明确标记的 `trusted_official_adapter` 可从官方结构化列表自动刷新核验状态。
 
 ## 16. Dashboard
 

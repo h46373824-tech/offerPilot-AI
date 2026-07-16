@@ -11,6 +11,21 @@ from app.models import Company, DataSource, Job
 OFFICIAL_SEED_KEY = "official_launch_verified_2026-07-16"
 VERIFIED_AT = datetime(2026, 7, 16, 4, 0, tzinfo=UTC)
 
+AUTOMATED_SOURCE_CONFIG: dict[str, dict[str, str | int | bool]] = {
+    "百度": {
+        "feed_url": ("https://talent.baidu.com/jobs/list?projectType=3&recruitType=GRADUATE"),
+        "parser_mode": "baidu_ssr",
+        "is_crawl_enabled": True,
+        "crawl_interval_minutes": 1440,
+    }
+}
+
+SUPERSEDED_OFFICIAL_TITLES: dict[str, tuple[str, ...]] = {
+    "百度": tuple(
+        f"2027校园招聘·{category}类岗位" for category in ("技术", "产品", "政企", "销售", "综合")
+    )
+}
+
 
 class JobSpec(TypedDict, total=False):
     title: str
@@ -60,6 +75,25 @@ def _campaign(
     if deadline:
         result["deadline"] = deadline
     return result
+
+
+def _baidu_job(
+    title: str,
+    post_id: str,
+    *,
+    cities: str = "北京市",
+    open_date: str = "2026-05-12",
+) -> JobSpec:
+    return _campaign(
+        title,
+        "人工智能技术",
+        f"https://talent.baidu.com/jobs/detail/GRADUATE/{post_id}",
+        "百度 2027 AIDU 官方岗位，工作职责和任职要求以官方详情页为准。",
+        cities=cities,
+        education="硕士/博士优先，以官方岗位为准",
+        major="计算机、人工智能、自动化等相关专业",
+        open_date=open_date,
+    )
 
 
 OFFICIAL_COMPANIES: tuple[CompanySpec, ...] = (
@@ -115,14 +149,61 @@ OFFICIAL_COMPANIES: tuple[CompanySpec, ...] = (
         "evidence": "官方校招页显示 2026-07-09 起网申，面向 2026-09 至 2027-08 毕业生。",
         "jobs": [
             _campaign(
-                f"2027校园招聘·{category}类岗位",
-                category,
-                "https://talent.baidu.com/jobs/campus",
-                f"百度官方确认开放的{category}类校园岗位，具体职位以官网筛选结果为准。",
+                "2027届校园招聘全部岗位",
+                "校园招聘",
+                "https://talent.baidu.com/jobs/list?recruitType=GRADUATE",
+                "百度官方 2027 届校招完整列表入口，可按城市、项目和岗位类型筛选。",
                 cities="北京、上海、深圳等",
                 open_date="2026-07-09",
-            )
-            for category in ("技术", "产品", "政企", "销售", "综合")
+            ),
+            _baidu_job(
+                "2027AIDU-智能体算法研究员(J102506)",
+                "cbdc8a04-785e-483e-9037-43c2b7fa873e",
+                open_date="2026-07-10",
+            ),
+            _baidu_job(
+                "2027AIDU-大模型算法工程师(J99938)",
+                "ab5ec82f-a8be-4b4a-8e6f-5debc34ea804",
+                cities="北京市、深圳市",
+            ),
+            _baidu_job(
+                "2027AIDU-多模态算法工程师(J99956)",
+                "d29404bd-55de-4cc1-929b-e67d304abc97",
+                cities="北京市、上海市",
+            ),
+            _baidu_job(
+                "2027AIDU-AI异构计算研发工程师(J99964)",
+                "fe876a65-1a6c-499a-9506-2169009a02a1",
+                cities="北京市、上海市",
+            ),
+            _baidu_job(
+                "2027AIDU-语音大模型算法工程师(J99954)",
+                "8d528038-983d-4165-b6f0-1fea77e3097a",
+            ),
+            _baidu_job(
+                "2027AIDU-大模型Infra工程师(J99967)",
+                "3fbd2b8c-43a6-4fa6-a71c-784bfe2ec4cd",
+            ),
+            _baidu_job(
+                "2027AIDU-智能体算法工程师(J99969)",
+                "4f1cbc80-8332-4a92-b8fa-c0132b17d47e",
+            ),
+            _baidu_job(
+                "2027AIDU-Agent应用全栈工程师(J99974)",
+                "6f9c3a86-6557-409d-8fa7-e6f4c68d6765",
+            ),
+            _baidu_job(
+                "2027AIDU-基础模型架构师(J99976)",
+                "c259a4a3-f685-4a17-97aa-8ee19ff7257d",
+            ),
+            _baidu_job(
+                "2027AIDU-端到端系统架构师(J99978)",
+                "cd7d5159-6779-4298-abe4-1a97ccdcea35",
+            ),
+            _baidu_job(
+                "2027AIDU-世界模型架构师(J99982)",
+                "a4cfdb64-4af0-4374-999e-54460e8e8cb2",
+            ),
         ],
     },
     {
@@ -432,11 +513,29 @@ def seed_official() -> None:
                 )
                 db.add(source)
             source.base_url = spec["campus_website"]
-            source.feed_url = spec["campus_website"]
+            automated = AUTOMATED_SOURCE_CONFIG.get(spec["name"])
+            source.feed_url = str(automated["feed_url"]) if automated else spec["campus_website"]
             source.company_id = company.id
+            if automated:
+                source.source_type = "trusted_official_adapter"
+                source.parser_mode = str(automated["parser_mode"])
+                source.is_crawl_enabled = bool(automated["is_crawl_enabled"])
+                source.crawl_interval_minutes = int(automated["crawl_interval_minutes"])
             db.flush()
             company.data_source = source.name
             company.data_source_id = source.id
+
+            superseded_titles = SUPERSEDED_OFFICIAL_TITLES.get(spec["name"], ())
+            if superseded_titles:
+                for superseded in db.scalars(
+                    select(Job).where(
+                        Job.company_id == company.id,
+                        Job.title.in_(superseded_titles),
+                        Job.is_demo.is_(False),
+                    )
+                ):
+                    superseded.recruitment_status = "superseded"
+                    superseded.last_verified_at = None
 
             for job_spec in spec["jobs"]:
                 job = db.scalar(

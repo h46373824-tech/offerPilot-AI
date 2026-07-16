@@ -469,6 +469,7 @@ function OfficialSyncPanel({
               <option value="rss">RSS</option>
               <option value="atom">Atom</option>
               <option value="json_feed">JSON Feed</option>
+              <option value="baidu_ssr">百度官方校招适配器</option>
             </select>
             <select
               className="field"
