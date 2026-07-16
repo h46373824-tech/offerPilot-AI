@@ -13,6 +13,7 @@ from urllib.error import HTTPError
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.robotparser import RobotFileParser
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -35,6 +36,27 @@ ALLOWED_CONTENT_TYPES = {
 
 class CrawlError(ValueError):
     pass
+
+
+def next_daily_crawl(
+    now: datetime,
+    *,
+    hour: int | None = None,
+    timezone_name: str | None = None,
+) -> datetime:
+    """Return the next configured local daily crawl time as an aware UTC value."""
+    target_hour = settings.crawler_daily_hour if hour is None else hour
+    target_timezone = settings.crawler_timezone if timezone_name is None else timezone_name
+    try:
+        local_timezone = ZoneInfo(target_timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise CrawlError(f"无效的抓取时区：{target_timezone}") from exc
+    normalized = now if now.tzinfo is not None else now.replace(tzinfo=UTC)
+    local_now = normalized.astimezone(local_timezone)
+    candidate = local_now.replace(hour=target_hour, minute=0, second=0, microsecond=0)
+    if candidate <= local_now:
+        candidate += timedelta(days=1)
+    return candidate.astimezone(UTC)
 
 
 @dataclass(frozen=True)
@@ -433,7 +455,11 @@ def run_source_crawl(db: Session, source: DataSource) -> CrawlRun:
     finished = datetime.now(UTC)
     run.finished_at = finished
     source.last_crawled_at = finished
-    source.next_crawl_at = finished + timedelta(minutes=source.crawl_interval_minutes)
+    source.next_crawl_at = (
+        next_daily_crawl(finished)
+        if source.source_type == "trusted_official_adapter"
+        else finished + timedelta(minutes=source.crawl_interval_minutes)
+    )
     db.commit()
     db.refresh(run)
     return run

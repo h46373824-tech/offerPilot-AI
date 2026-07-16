@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.services import official_crawler
-from app.services.official_crawler import CrawlError, DiscoveredJob
+from app.services.official_crawler import CrawlError, DiscoveredJob, next_daily_crawl
 
 
 def register_admin(client: TestClient) -> dict[str, str]:
@@ -75,6 +75,18 @@ def test_parsers_extract_official_links() -> None:
 def test_crawler_rejects_private_network_targets() -> None:
     with pytest.raises(CrawlError, match="内网"):
         official_crawler.validate_public_url("http://127.0.0.1:8000/jobs")
+
+
+def test_next_daily_crawl_uses_shanghai_five_am() -> None:
+    before_five = datetime(2026, 7, 16, 20, 0, tzinfo=UTC)
+    after_five = datetime(2026, 7, 16, 22, 0, tzinfo=UTC)
+
+    assert next_daily_crawl(before_five, hour=5, timezone_name="Asia/Shanghai") == datetime(
+        2026, 7, 16, 21, 0, tzinfo=UTC
+    )
+    assert next_daily_crawl(after_five, hour=5, timezone_name="Asia/Shanghai") == datetime(
+        2026, 7, 17, 21, 0, tzinfo=UTC
+    )
 
 
 def test_admin_can_sync_discovered_job_and_link(

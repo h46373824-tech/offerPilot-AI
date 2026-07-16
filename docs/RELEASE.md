@@ -11,7 +11,7 @@
 
 ## GitHub 仓库设置
 
-- [ ] 选择并添加明确的 `LICENSE`；选择前不得宣传为开源项目
+- [x] 添加 Apache License 2.0 `LICENSE` 并在 README 声明
 - [ ] 将 `dev` 或 `main` 设置为默认分支并启用分支保护
 - [ ] 要求 Pull Request、CI 状态检查和至少一次审核
 - [ ] 启用 Dependabot alerts、secret scanning 与 push protection

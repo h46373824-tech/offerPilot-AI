@@ -92,7 +92,7 @@ backend/app/
 
 当前路由按资源分为 `auth`、`companies`、`jobs`、`favorites`、`applications`、`interviews`、`offers`、`notifications`、`resumes`、`job_alerts`、`activity` 和 `dashboard`。第二阶段新增 service 层承载附件存储、提醒生成和审计写入；更复杂的查询可继续下沉到 repository 层。
 
-第四阶段在 FastAPI lifespan 中启动单进程本地调度循环。循环只查询到期且启用的数据源，通过独立数据库 Session 运行同步；解析器位于 `services/official_crawler.py`。通用 HTML/RSS/JSON 解析结果仍需人工核验；只有代码内置且限定官方域名的 `trusted_official_adapter` 可直接刷新开放状态和核验时间。URL 在请求及重定向时进行公网校验，robots.txt、超时、响应大小和每批条数均为硬限制。该设计适合 Compose 中的单个 Uvicorn 实例；扩展为多实例前必须迁移到带分布式锁的任务队列。
+第四阶段在 FastAPI lifespan 中启动单进程本地调度循环。循环只查询到期且启用的数据源，通过独立数据库 Session 运行同步；可信官方适配器按 `Asia/Shanghai` 每天 `05:00` 执行，通用来源仍保留管理员配置的间隔。解析器位于 `services/official_crawler.py`。通用 HTML/RSS/JSON 解析结果仍需人工核验；只有代码内置且限定官方域名的 `trusted_official_adapter` 可直接刷新开放状态和核验时间。URL 在请求及重定向时进行公网校验，robots.txt、超时、响应大小和每批条数均为硬限制。该设计适合 Compose 中的单个 Uvicorn 实例；扩展为多实例前必须迁移到带分布式锁的任务队列。
 
 ### 4.3 数据层
 
@@ -254,7 +254,7 @@ Prettier 和 `ruff format --check` 是提交前的本地检查；若团队希望
 - Demo 企业与岗位不携带真实投递链接；
 - 数据来源和最后核验时间是核心元数据，不得在导入时丢弃；
 - 审计日志只保存必要变更摘要，不复制敏感正文；
-- 数据库和 Redis 端口在 Compose 中为本地开发开放，生产部署不应直接暴露公网。
+- 前端、后端、数据库和 Redis 的 Compose 端口均绑定 `127.0.0.1`，局域网和公网无法直接访问。
 
 ## 12. 扩展路径
 

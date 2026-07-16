@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-offerpilot}
       POSTGRES_USER: ${POSTGRES_USER:-offerpilot}
@@ -8,7 +9,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-offerpilot} -d ${POSTGRES_DB:-offerpilot}"]
       interval: 5s
@@ -17,11 +18,12 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -30,6 +32,7 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-offerpilot}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-offerpilot}
       REDIS_URL: redis://redis:6379/0
@@ -39,12 +42,14 @@ services:
       MAX_IMPORT_BYTES: ${MAX_IMPORT_BYTES:-5242880}
       CRAWLER_ENABLED: ${CRAWLER_ENABLED:-true}
       CRAWLER_TICK_SECONDS: ${CRAWLER_TICK_SECONDS:-60}
+      CRAWLER_DAILY_HOUR: ${CRAWLER_DAILY_HOUR:-5}
+      CRAWLER_TIMEZONE: ${CRAWLER_TIMEZONE:-Asia/Shanghai}
       CRAWLER_TIMEOUT_SECONDS: ${CRAWLER_TIMEOUT_SECONDS:-10}
       CRAWLER_MAX_RESPONSE_BYTES: ${CRAWLER_MAX_RESPONSE_BYTES:-2097152}
       CRAWLER_MAX_ITEMS_PER_RUN: ${CRAWLER_MAX_ITEMS_PER_RUN:-100}
       CRAWLER_USER_AGENT: ${CRAWLER_USER_AGENT:-OfferPilotAI/0.5 (local official-source sync)}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - uploads_data:/app/data/uploads
     depends_on:
@@ -63,10 +68,11 @@ services:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       backend:
         condition: service_healthy

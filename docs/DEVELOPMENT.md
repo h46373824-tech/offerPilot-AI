@@ -30,6 +30,8 @@ git status --short
 .\scripts\setup-local.ps1 -AdminEmail "admin@offerpilot.example.com"
 ```
 
+Compose 只在宿主机 `127.0.0.1` 发布端口。应用数据保存在本地 Docker 卷；只有启用的官方招聘适配器会按计划向已批准的企业官网发出读取请求。
+
 脚本只在仓库根目录创建被忽略的 `.env`，并将业务数据保存在本项目 Docker 卷中。
 
 ```powershell

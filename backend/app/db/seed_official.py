@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models import Company, DataSource, Job
+from app.services.official_crawler import next_daily_crawl
 
 OFFICIAL_SEED_KEY = "official_launch_verified_2026-07-16"
 VERIFIED_AT = datetime(2026, 7, 16, 4, 0, tzinfo=UTC)
@@ -521,6 +522,12 @@ def seed_official() -> None:
                 source.parser_mode = str(automated["parser_mode"])
                 source.is_crawl_enabled = bool(automated["is_crawl_enabled"])
                 source.crawl_interval_minutes = int(automated["crawl_interval_minutes"])
+                now = datetime.now(UTC)
+                scheduled_at = source.next_crawl_at
+                if scheduled_at is not None and scheduled_at.tzinfo is None:
+                    scheduled_at = scheduled_at.replace(tzinfo=UTC)
+                if scheduled_at is None or scheduled_at > now:
+                    source.next_crawl_at = next_daily_crawl(now)
             db.flush()
             company.data_source = source.name
             company.data_source_id = source.id
