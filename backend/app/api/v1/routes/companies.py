@@ -1,11 +1,12 @@
 import math
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.api.deps import CurrentAdmin, CurrentUser, Db
+from app.api.deps import CurrentAdmin, Db
 from app.models import Company
 from app.schemas import CompanyCreate, CompanyOut, CompanyUpdate, Page
 
@@ -15,7 +16,6 @@ router = APIRouter(prefix="/companies", tags=["企业"])
 @router.get("", response_model=Page[CompanyOut])
 def list_companies(
     db: Db,
-    _: CurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: str | None = None,
@@ -26,6 +26,8 @@ def list_companies(
     accepts_college: bool | None = None,
     accepts_bachelor: bool | None = None,
     is_demo: bool | None = None,
+    verified_only: bool = False,
+    verified_within_days: int | None = Query(None, ge=1, le=365),
     sort_by: Literal["name", "created_at", "deadline"] = "created_at",
     order: Literal["asc", "desc"] = "desc",
 ) -> Page[CompanyOut]:
@@ -48,6 +50,12 @@ def list_companies(
         filters.append(Company.accepts_bachelor.is_(accepts_bachelor))
     if is_demo is not None:
         filters.append(Company.is_demo.is_(is_demo))
+    if verified_only:
+        filters.append(Company.last_verified_at.is_not(None))
+    if verified_within_days is not None:
+        filters.append(
+            Company.last_verified_at >= datetime.now(UTC) - timedelta(days=verified_within_days)
+        )
     total = db.scalar(select(func.count(Company.id)).where(*filters)) or 0
     column = getattr(Company, sort_by)
     stmt = (
@@ -83,7 +91,7 @@ def _get_company(db: Db, item_id: int) -> Company:
 
 
 @router.get("/{item_id}", response_model=CompanyOut)
-def get_company(item_id: int, db: Db, _: CurrentUser) -> Company:
+def get_company(item_id: int, db: Db) -> Company:
     return _get_company(db, item_id)
 
 

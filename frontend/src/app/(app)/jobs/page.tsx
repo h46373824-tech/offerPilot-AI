@@ -5,7 +5,7 @@ export default function Page() {
     <>
       <PageHeader
         title="岗位库"
-        description="按城市、学历与岗位类别筛选示例校招岗位。"
+        description="无需登录即可浏览已核验的 2027 届招聘项目与岗位，并跳转企业官方渠道投递。"
       />
       <JobTable />
     </>

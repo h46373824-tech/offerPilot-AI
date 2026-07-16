@@ -43,8 +43,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title=settings.app_name,
-    description="面向 2027 届校招的 AI 求职管理平台 API。Demo 数据不代表实时招聘状态。",
-    version="0.4.0",
+    description=(
+        "面向 2027 届校招的 AI 求职管理平台 API。"
+        "企业和岗位读取可公开访问，个人与管理操作需要认证。"
+        "Demo 数据不代表实时招聘状态，正式数据应结合核验日期使用。"
+    ),
+    version="0.5.0",
     openapi_url="/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",

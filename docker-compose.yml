@@ -42,7 +42,7 @@ services:
       CRAWLER_TIMEOUT_SECONDS: ${CRAWLER_TIMEOUT_SECONDS:-10}
       CRAWLER_MAX_RESPONSE_BYTES: ${CRAWLER_MAX_RESPONSE_BYTES:-2097152}
       CRAWLER_MAX_ITEMS_PER_RUN: ${CRAWLER_MAX_ITEMS_PER_RUN:-100}
-      CRAWLER_USER_AGENT: ${CRAWLER_USER_AGENT:-OfferPilotAI/0.4 (local official-source sync)}
+      CRAWLER_USER_AGENT: ${CRAWLER_USER_AGENT:-OfferPilotAI/0.5 (local official-source sync)}
     ports:
       - "8000:8000"
     volumes:

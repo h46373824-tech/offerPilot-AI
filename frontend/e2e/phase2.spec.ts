@@ -79,6 +79,7 @@ test("岗位库可以跳转到官方投递链接", async ({ page }) => {
   };
   const headers = { Authorization: `Bearer ${token}` };
   const suffix = Date.now();
+  const verifiedAt = new Date().toISOString();
   const company = await page.request.post(`${apiUrl}/companies`, {
     data: {
       name: `投递链接测试企业-${suffix}`,
@@ -86,6 +87,8 @@ test("岗位库可以跳转到官方投递链接", async ({ page }) => {
       company_type: "测试",
       education_requirement: "待核验",
       work_cities: "待核验",
+      recruitment_status: "open",
+      last_verified_at: verifiedAt,
     },
     headers,
   });
@@ -103,7 +106,8 @@ test("岗位库可以跳转到官方投递链接", async ({ page }) => {
       description: "端到端测试",
       requirements: "待核验",
       application_url: applicationUrl,
-      recruitment_status: "unverified",
+      recruitment_status: "open",
+      last_verified_at: verifiedAt,
     },
     headers,
   });
@@ -133,13 +137,14 @@ test.describe("移动端", () => {
     viewport: iphone.viewport,
   });
 
-  test("访客可以浏览 Demo 岗位并打开导航", async ({ page }) => {
+  test("访客无需登录即可浏览已核验岗位并打开导航", async ({ page }) => {
     await page.goto("/jobs");
     await expect(page.getByRole("heading", { name: "岗位库" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "前往官方投递" }).first(),
+    ).toBeVisible();
     await page.getByRole("button", { name: "打开主导航" }).click();
     await expect(page.getByRole("navigation")).toBeVisible();
-    await expect(
-      page.getByText("Demo", { exact: false }).first(),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "企业库" })).toBeVisible();
   });
 });

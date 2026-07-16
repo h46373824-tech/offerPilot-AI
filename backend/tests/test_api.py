@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.db.seed import DEMO_SOURCE, seed
+from app.db.seed_official import seed_official
 from app.db.session import SessionLocal
 from app.models import Company, Job, Notification, User
 
@@ -105,7 +106,8 @@ def test_register_json_login_oauth2_login_and_me(client: TestClient) -> None:
 
 
 def test_company_and_job_crud_search_filter_and_pagination(client: TestClient) -> None:
-    assert client.get("/api/v1/companies").status_code == 401
+    assert client.get("/api/v1/companies").status_code == 200
+    assert client.get("/api/v1/jobs").status_code == 200
     headers = register(client)
     company_id, job_id = create_company_and_job(client, headers)
 
@@ -151,6 +153,70 @@ def test_company_and_job_crud_search_filter_and_pagination(client: TestClient) -
 
     assert client.delete(f"/api/v1/jobs/{job_id}", headers=headers).status_code == 204
     assert client.delete(f"/api/v1/companies/{company_id}", headers=headers).status_code == 204
+
+
+def test_public_catalog_excludes_stale_verification(client: TestClient) -> None:
+    now = datetime.now(UTC)
+    with SessionLocal.begin() as db:
+        fresh = Company(
+            name="近期核验企业",
+            industry="人工智能",
+            company_type="测试",
+            recruitment_status="open",
+            education_requirement="本科及以上",
+            work_cities="北京",
+            is_demo=False,
+            last_verified_at=now,
+        )
+        stale = Company(
+            name="过期核验企业",
+            industry="人工智能",
+            company_type="测试",
+            recruitment_status="open",
+            education_requirement="本科及以上",
+            work_cities="北京",
+            is_demo=False,
+            last_verified_at=now - timedelta(days=31),
+        )
+        db.add_all([fresh, stale])
+        db.flush()
+        db.add_all(
+            [
+                Job(
+                    title="近期核验岗位",
+                    company_id=fresh.id,
+                    category="技术",
+                    work_cities="北京",
+                    education_requirement="本科及以上",
+                    description="测试岗位",
+                    requirements="测试要求",
+                    recruitment_status="open",
+                    is_demo=False,
+                    last_verified_at=now,
+                ),
+                Job(
+                    title="过期核验岗位",
+                    company_id=stale.id,
+                    category="技术",
+                    work_cities="北京",
+                    education_requirement="本科及以上",
+                    description="测试岗位",
+                    requirements="测试要求",
+                    recruitment_status="open",
+                    is_demo=False,
+                    last_verified_at=now - timedelta(days=31),
+                ),
+            ]
+        )
+
+    params: dict[str, str | int] = {"verified_only": "true", "verified_within_days": 30}
+    companies = client.get("/api/v1/companies", params=params)
+    jobs = client.get("/api/v1/jobs", params=params)
+
+    assert companies.status_code == 200
+    assert [item["name"] for item in companies.json()["items"]] == ["近期核验企业"]
+    assert jobs.status_code == 200
+    assert [item["title"] for item in jobs.json()["items"]] == ["近期核验岗位"]
 
 
 def test_application_favorite_interview_and_offer_lifecycle(client: TestClient) -> None:
@@ -305,6 +371,29 @@ def test_demo_seed_is_idempotent_and_explicitly_non_realtime(client: TestClient)
     assert all(item.is_demo and item.recruitment_status == "demo_only" for item in demo_companies)
     assert all(item.is_demo and item.recruitment_status == "demo_only" for item in demo_jobs)
     assert all(item.application_url is None for item in demo_jobs)
+
+
+def test_official_launch_seed_is_idempotent_and_traceable(client: TestClient) -> None:
+    del client
+    seed_official()
+    seed_official()
+
+    with SessionLocal() as db:
+        official_companies = list(
+            db.scalars(
+                select(Company).where(
+                    Company.is_demo.is_(False), Company.last_verified_at.is_not(None)
+                )
+            )
+        )
+        official_jobs = list(
+            db.scalars(select(Job).where(Job.is_demo.is_(False), Job.last_verified_at.is_not(None)))
+        )
+
+    assert len(official_companies) == 14
+    assert len(official_jobs) == 23
+    assert all(item.data_source.endswith("官方招聘来源") for item in official_companies)
+    assert all(item.application_url and item.data_source_id for item in official_jobs)
 
 
 def test_offer_rejects_invalid_date_range(client: TestClient) -> None:

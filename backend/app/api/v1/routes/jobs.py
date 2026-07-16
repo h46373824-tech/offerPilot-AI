@@ -1,11 +1,12 @@
 import math
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.api.deps import CurrentAdmin, CurrentUser, Db
+from app.api.deps import CurrentAdmin, Db
 from app.models import Company, Job
 from app.schemas import JobCreate, JobOut, JobUpdate, Page
 
@@ -15,7 +16,6 @@ router = APIRouter(prefix="/jobs", tags=["岗位"])
 @router.get("", response_model=Page[JobOut])
 def list_jobs(
     db: Db,
-    _: CurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: str | None = None,
@@ -25,6 +25,8 @@ def list_jobs(
     company_id: int | None = None,
     recruitment_status: str | None = None,
     is_demo: bool | None = None,
+    verified_only: bool = False,
+    verified_within_days: int | None = Query(None, ge=1, le=365),
     sort_by: Literal["title", "published_at", "deadline", "created_at"] = "created_at",
     order: Literal["asc", "desc"] = "desc",
 ) -> Page[JobOut]:
@@ -49,6 +51,12 @@ def list_jobs(
         filters.append(Job.recruitment_status == recruitment_status)
     if is_demo is not None:
         filters.append(Job.is_demo.is_(is_demo))
+    if verified_only:
+        filters.append(Job.last_verified_at.is_not(None))
+    if verified_within_days is not None:
+        filters.append(
+            Job.last_verified_at >= datetime.now(UTC) - timedelta(days=verified_within_days)
+        )
     total = db.scalar(select(func.count(Job.id)).where(*filters)) or 0
     column = getattr(Job, sort_by)
     stmt = (
@@ -75,7 +83,7 @@ def _get(db: Db, item_id: int) -> Job:
 
 
 @router.get("/{item_id}", response_model=JobOut)
-def get_job(item_id: int, db: Db, _: CurrentUser) -> Job:
+def get_job(item_id: int, db: Db) -> Job:
     return _get(db, item_id)
 
 

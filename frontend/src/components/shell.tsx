@@ -44,6 +44,8 @@ const navigation = [
   ["/settings", "设置", Settings],
 ] as const;
 
+const publicPaths = new Set(["/companies", "/jobs"]);
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const authenticated = useHasToken();
@@ -89,7 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-18 shrink-0 items-center justify-between px-5">
           <Link
             className="text-xl font-black tracking-tight"
-            href="/dashboard"
+            href={authenticated ? "/dashboard" : "/jobs"}
             onClick={() => setMobileOpen(false)}
           >
             OfferPilot <span className="text-teal-400">AI</span>
@@ -107,11 +109,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mx-4 mb-5 rounded-xl border border-teal-400/20 bg-teal-400/10 p-3 text-xs text-teal-100">
           <b>2027 届校招</b>
           <br />
-          Demo 数据 · 非实时招聘信息
+          官方来源 · 展示核验日期
         </div>
 
         <nav className="space-y-1 px-3 pb-5">
           {navigation.map(([href, label, Icon]) => {
+            if (!authenticated && !publicPaths.has(href)) return null;
             if (href === "/admin" && !user.data?.is_admin) return null;
             const active = pathname === href;
 
@@ -170,14 +173,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Moon aria-hidden="true" size={20} />
               )}
             </button>
-            <NotificationMenu />
-            <div
-              aria-label={`当前用户：${user.data?.full_name ?? "应届生用户"}`}
-              className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-sm font-bold text-white"
-              role="img"
-            >
-              {(user.data?.full_name ?? "应届生").slice(0, 1)}
-            </div>
+            {authenticated ? (
+              <>
+                <NotificationMenu />
+                <div
+                  aria-label={`当前用户：${user.data?.full_name ?? "应届生用户"}`}
+                  className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-sm font-bold text-white"
+                  role="img"
+                >
+                  {(user.data?.full_name ?? "应届生").slice(0, 1)}
+                </div>
+              </>
+            ) : (
+              <Link className="btn-primary py-2" href="/login">
+                登录管理求职进度
+              </Link>
+            )}
           </div>
         </header>
 

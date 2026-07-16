@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     crawler_timeout_seconds: int = Field(default=10, ge=2, le=60)
     crawler_max_response_bytes: int = Field(default=2 * 1024 * 1024, ge=1024)
     crawler_max_items_per_run: int = Field(default=100, ge=1, le=500)
-    crawler_user_agent: str = "OfferPilotAI/0.4 (local official-source sync)"
+    crawler_user_agent: str = "OfferPilotAI/0.5 (local official-source sync)"
 
     @property
     def cors_origin_list(self) -> list[str]:

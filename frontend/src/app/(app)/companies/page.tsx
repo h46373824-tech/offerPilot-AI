@@ -5,7 +5,7 @@ export default function Page() {
     <>
       <PageHeader
         title="企业库"
-        description="发现适合 2027 届毕业生的示例企业，所有数据均为 Demo。"
+        description="公开浏览已核验招聘来源的企业；状态与链接以企业官网最新信息为准。"
       />
       <CompanyTable />
     </>

@@ -371,12 +371,14 @@ Docker 启动会自动执行升级。生产环境应由单独的发布任务执�
 ```bash
 cd backend
 python -m app.db.seed
+python -m app.db.seed_official
 ```
 
 Docker 环境：
 
 ```bash
 docker compose exec backend python -m app.db.seed
+docker compose exec backend python -m app.db.seed_official
 ```
 
 种子脚本在企业表非空时直接返回，避免重复插入。首次运行写入：
@@ -389,6 +391,8 @@ docker compose exec backend python -m app.db.seed
 - 不声称任何企业处于实时开放状态。
 
 由于脚本采用“表是否为空”的简单幂等判断，它不是通用的数据同步工具。正式基准数据应使用稳定外部 ID、upsert、变更日志和版本化导入批次。
+
+`seed_official` 使用稳定来源名称幂等写入 2026-07-16 核验的 14 家企业和 23 个招聘项目/岗位，保留官方投递链接、数据来源和核验时间。它不在启动时访问外网，也不将固定核验日期推迟；完整溯源见 `database/official-recruitment-2026-07-16.csv`。
 
 ## 8. 本地数据重置
 

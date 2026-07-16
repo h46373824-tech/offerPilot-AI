@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, ExternalLink, Search, X } from "lucide-react";
 import {
@@ -14,71 +14,58 @@ import { apiFetch } from "@/lib/api";
 import { useHasToken } from "@/lib/auth";
 import type { ApiPage, Company, Favorite, Job } from "@/lib/types";
 
-type CompanyRow = readonly [
-  name: string,
-  industry: string,
-  companyType: string,
-  workCities: string,
-  education: string,
-];
-
-type CompanyApiItem = {
-  id: number;
+type CompanyRow = {
   name: string;
   industry: string;
-  company_type: string;
-  work_cities: string;
-  education_requirement: string;
-  is_demo: boolean;
+  companyType: string;
+  workCities: string;
+  education: string;
+  campusWebsite: string | null;
+  lastVerifiedAt: string | null;
+  isDemo: boolean;
 };
-
-function subscribeToAuth(onStoreChange: () => void) {
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
-}
-
-function getAuthSnapshot() {
-  return Boolean(window.localStorage.getItem("access_token"));
-}
-
-function getServerAuthSnapshot() {
-  return false;
-}
 
 export function CompanyTable() {
   const [query, setQuery] = useState("");
   const [industry, setIndustry] = useState("");
   const [education, setEducation] = useState("");
-  const authenticated = useSyncExternalStore(
-    subscribeToAuth,
-    getAuthSnapshot,
-    getServerAuthSnapshot,
-  );
   const companiesQuery = useQuery({
-    enabled: authenticated,
     queryFn: () =>
-      apiFetch<ApiPage<CompanyApiItem>>(
-        "/companies?page_size=100&is_demo=true&sort_by=name&order=asc",
+      apiFetch<ApiPage<Company>>(
+        "/companies?page_size=100&is_demo=false&verified_only=true&verified_within_days=30&recruitment_status=open&sort_by=name&order=asc",
       ),
-    queryKey: ["companies", "demo"],
+    queryKey: ["companies", "public-verified"],
   });
   const sourceRows = useMemo<readonly CompanyRow[]>(() => {
-    if (!companiesQuery.data) return companies;
+    if (!companiesQuery.data)
+      return companies.map((company) => ({
+        name: company[0],
+        industry: company[1],
+        companyType: company[2],
+        workCities: company[3],
+        education: company[4],
+        campusWebsite: null,
+        lastVerifiedAt: null,
+        isDemo: true,
+      }));
 
-    return companiesQuery.data.items.map((company) => [
-      company.name,
-      company.industry,
-      company.company_type,
-      company.work_cities,
-      company.education_requirement,
-    ]);
+    return companiesQuery.data.items.map((company) => ({
+      name: company.name,
+      industry: company.industry,
+      companyType: company.company_type,
+      workCities: company.work_cities,
+      education: company.education_requirement,
+      campusWebsite: company.campus_website,
+      lastVerifiedAt: company.last_verified_at,
+      isDemo: company.is_demo,
+    }));
   }, [companiesQuery.data]);
   const industries = useMemo(
-    () => Array.from(new Set(sourceRows.map((company) => company[1]))),
+    () => Array.from(new Set(sourceRows.map((company) => company.industry))),
     [sourceRows],
   );
   const educations = useMemo(
-    () => Array.from(new Set(sourceRows.map((company) => company[4]))),
+    () => Array.from(new Set(sourceRows.map((company) => company.education))),
     [sourceRows],
   );
   const rows = useMemo(() => {
@@ -86,24 +73,20 @@ export function CompanyTable() {
 
     return sourceRows.filter(
       (company) =>
-        (!keyword || company.join(" ").toLowerCase().includes(keyword)) &&
-        (!industry || company[1] === industry) &&
-        (!education || company[4] === education),
+        (!keyword ||
+          Object.values(company).join(" ").toLowerCase().includes(keyword)) &&
+        (!industry || company.industry === industry) &&
+        (!education || company.education === education),
     );
   }, [education, industry, query, sourceRows]);
   const hasFilters = Boolean(query || industry || education);
 
-  if (authenticated && companiesQuery.isPending) {
+  if (companiesQuery.isPending) {
     return <LoadingState text="正在从服务端加载企业数据…" />;
   }
 
   return (
     <>
-      {!authenticated && (
-        <p className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
-          当前未登录，企业库展示 Demo 示例数据。
-        </p>
-      )}
       {companiesQuery.isError && (
         <div className="mb-4">
           <ErrorState
@@ -116,7 +99,7 @@ export function CompanyTable() {
                 重新同步
               </button>
             }
-            text="实时企业数据暂不可用，已自动切换为 Demo 数据。"
+            text="官方企业数据暂不可用，已自动切换为明确标记的 Demo 数据。"
           />
         </div>
       )}
@@ -147,16 +130,40 @@ export function CompanyTable() {
                 <th scope="col">工作城市</th>
                 <th scope="col">学历要求</th>
                 <th scope="col">状态</th>
+                <th scope="col">官方招聘</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row[0]}>
-                  {row.map((value, index) => (
-                    <td key={`${row[0]}-${index}`}>{value}</td>
-                  ))}
+                <tr key={row.name}>
+                  <td className="font-semibold">{row.name}</td>
+                  <td>{row.industry}</td>
+                  <td>{row.companyType}</td>
+                  <td>{row.workCities}</td>
+                  <td>{row.education}</td>
                   <td>
-                    <Badge tone="slate">Demo · 待核验</Badge>
+                    <Badge tone={row.isDemo ? "slate" : "teal"}>
+                      {row.isDemo
+                        ? "Demo · 非实时"
+                        : `已核验 ${row.lastVerifiedAt?.slice(5, 10) ?? ""}`}
+                    </Badge>
+                  </td>
+                  <td>
+                    {row.campusWebsite ? (
+                      <a
+                        className="inline-flex items-center gap-1 font-semibold whitespace-nowrap text-teal-600 hover:text-teal-700"
+                        href={row.campusWebsite}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        招聘官网
+                        <ExternalLink aria-hidden="true" size={14} />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-[var(--muted)]">
+                        暂无链接
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -198,17 +205,18 @@ export function JobTable() {
   const [category, setCategory] = useState("");
   const [education, setEducation] = useState("");
   const jobsQuery = useQuery({
-    enabled: authenticated,
-    queryKey: ["jobs"],
+    queryKey: ["jobs", "public-verified"],
     queryFn: () =>
       apiFetch<ApiPage<Job>>(
-        "/jobs?page_size=100&sort_by=created_at&order=desc",
+        "/jobs?page_size=100&is_demo=false&verified_only=true&verified_within_days=30&recruitment_status=open&sort_by=published_at&order=desc",
       ),
   });
   const companiesQuery = useQuery({
-    enabled: authenticated,
     queryKey: ["companies", "job-map"],
-    queryFn: () => apiFetch<ApiPage<Company>>("/companies?page_size=100"),
+    queryFn: () =>
+      apiFetch<ApiPage<Company>>(
+        "/companies?page_size=100&is_demo=false&verified_only=true&verified_within_days=30",
+      ),
   });
   const favoritesQuery = useQuery({
     enabled: authenticated,
@@ -256,6 +264,7 @@ export function JobTable() {
         status: job.recruitment_status,
         isDemo: job.is_demo,
         verified: Boolean(job.last_verified_at),
+        lastVerifiedAt: job.last_verified_at,
       })) ??
       jobs.map((job, index) => ({
         id: -(index + 1),
@@ -269,6 +278,7 @@ export function JobTable() {
         status: "unverified",
         isDemo: true,
         verified: false,
+        lastVerifiedAt: null,
       })),
     [companyNames, jobsQuery.data],
   );
@@ -295,11 +305,27 @@ export function JobTable() {
     );
   }, [category, education, query, sourceRows]);
 
-  if (authenticated && jobsQuery.isPending)
+  if (jobsQuery.isPending || companiesQuery.isPending)
     return <LoadingState text="正在加载岗位数据…" />;
 
   return (
     <>
+      {jobsQuery.isError && (
+        <div className="mb-4">
+          <ErrorState
+            action={
+              <button
+                className="btn-primary"
+                onClick={() => void jobsQuery.refetch()}
+                type="button"
+              >
+                重新加载
+              </button>
+            }
+            text="官方岗位暂不可用，当前仅展示 Demo 降级数据。"
+          />
+        </div>
+      )}
       <Filters
         category={category}
         categoryLabel="岗位类别"
@@ -352,7 +378,7 @@ export function JobTable() {
                       {row.isDemo
                         ? "Demo · 非实时"
                         : row.verified
-                          ? "已核验"
+                          ? `已核验 ${row.lastVerifiedAt?.slice(5, 10) ?? ""}`
                           : "待核验"}
                     </Badge>
                   </td>

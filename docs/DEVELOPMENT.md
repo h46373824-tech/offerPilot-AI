@@ -44,7 +44,7 @@ docker compose up --build
 - Swagger：`http://localhost:8000/docs`
 - 健康检查：`http://localhost:8000/health`
 
-backend 容器会自动运行迁移和幂等 Demo 种子。查看状态：
+backend 容器会自动运行迁移、幂等 Demo 种子和固定核验日期的正式基线种子。查看状态：
 
 ```bash
 docker compose ps
@@ -76,6 +76,7 @@ $env:SECRET_KEY = "replace-with-a-long-local-random-secret"
 $env:CORS_ORIGINS = "http://localhost:3000"
 alembic upgrade head
 python -m app.db.seed
+python -m app.db.seed_official
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -250,9 +251,10 @@ alembic current
 
 ```bash
 python -m app.db.seed
+python -m app.db.seed_official
 ```
 
-种子数据只能用于演示或测试，必须保留明确 Demo 标识，不得加入未经验证的真实招聘状态。
+Demo 种子必须保留明确标识。正式基线只能来自可溯源的官方页面，保留核验日期和官方链接，不得宣传为全网实时覆盖。
 
 ## 7. 测试策略
 
@@ -262,7 +264,7 @@ python -m app.db.seed
 
 - 健康检查；
 - 注册、登录和当前用户；
-- 企业接口认证要求；
+- 企业和岗位公开读取、受保护写入；
 - 企业创建、搜索和基础分页响应。
 
 新增功能至少测试：
@@ -291,7 +293,7 @@ TEST_POSTGRES_URL=postgresql+psycopg://user:password@localhost:5432/test_db \
 - API 客户端与错误映射单元测试；
 - 登录/注册表单交互测试；
 - 搜索、筛选、分页和空状态组件测试；
-- Playwright 关键路径：注册 → Dashboard → 岗位订阅，以及移动端 Demo 浏览与导航；
+- Playwright 关键路径：注册 → Dashboard → 岗位订阅，以及访客移动端正式数据浏览与官方投递跳转；
 - 深色模式、移动导航与可访问性检查。
 
 运行 E2E（先启动 `docker compose up --build -d --wait`）：
@@ -310,11 +312,11 @@ npm run test:e2e -- --project=chromium
 2. 四个服务状态正常；
 3. `/health` 与 `/docs` 可访问；
 4. 注册与登录成功；
-5. 未登录业务接口返回 401；
-6. 企业和岗位列表可查询；
+5. 未登录可查询企业和岗位，个人与管理操作返回 401/403；
+6. 默认列表仅展示 30 天内核验的正式数据与官方投递入口；
 7. 手机宽度可打开和关闭导航；
 8. 深色模式在刷新后保留；
-9. 页面明确提示 Demo 非实时数据。
+9. 页面区分 Demo、核验日期和过期数据。
 10. 管理员可登记官方测试 Feed、查看同步结果，自动发现岗位保持待核验并显示官方投递入口。
 
 ## 8. Git 工作流

@@ -12,9 +12,9 @@
 | 数据格式 | JSON |
 | 认证方式 | `Authorization: Bearer <JWT>` |
 
-除 `GET /health`、注册和两种登录端点外，业务接口均需要有效 JWT。企业和岗位读取对登录用户开放，写操作及 `/api/v1/admin/*` 仅允许本地管理员。
+`GET /health`、注册、登录、企业读取和岗位读取无需 JWT。收藏、投递、简历、提醒等个人资源仍需要登录；企业/岗位写操作及 `/api/v1/admin/*` 仅允许本地管理员。
 
-> API 返回的种子企业与岗位是 Demo 数据，不代表真实或实时招聘。客户端必须保留 `is_demo`、`data_source`、`recruitment_status` 和 `last_verified_at` 的语义。
+> API 同时返回 Demo 与正式基线数据。客户端必须保留 `is_demo`、`data_source`、`recruitment_status` 和 `last_verified_at` 的语义；访客默认使用 `is_demo=false&verified_only=true&verified_within_days=30` 查询近期已核验数据。
 
 ## 2. 通用约定
 
@@ -184,6 +184,8 @@ username=student@example.com&password=strong-pass-123
 | `accepts_college` | 布尔值，筛选专科是否可投 |
 | `accepts_bachelor` | 布尔值，筛选本科是否可投 |
 | `is_demo` | 布尔值，区分 Demo 与正式数据 |
+| `verified_only` | 为 `true` 时只返回有核验时间的企业 |
+| `verified_within_days` | 1–365，只返回近期核验的企业 |
 | `sort_by` | `name`、`created_at`、`deadline` |
 | `order` | `asc`、`desc` |
 | `page` / `page_size` | 分页参数 |
@@ -243,6 +245,8 @@ GET /api/v1/companies?search=上海&industry=半导体&page=1&page_size=20&sort_
 | `company_id` | 按企业 ID 筛选 |
 | `recruitment_status` | 精确匹配招聘/核验状态 |
 | `is_demo` | 布尔值，区分 Demo 与正式数据 |
+| `verified_only` | 为 `true` 时只返回有核验时间的岗位 |
+| `verified_within_days` | 1–365，只返回近期核验的岗位 |
 | `sort_by` | `title`、`published_at`、`deadline`、`created_at` |
 | `order` | `asc`、`desc` |
 | `page` / `page_size` | 分页参数 |
@@ -511,14 +515,14 @@ GET /api/v1/notifications?unread_only=true
 
 口径：
 
-- `open_companies`、学历可投企业、今日新增和即将截止只统计 `is_demo = false` 且 `recruitment_status = open` 的记录；仅加载种子数据时这些实时语义指标均为 0；
+- `open_companies`、学历可投企业、今日新增和即将截止只统计 `is_demo = false` 且 `recruitment_status = open` 的本地记录；
 - 投递、面试、Offer、趋势和最近记录仅统计当前用户；
 - `expiring_jobs` 统计当前 UTC 时间起 14 天内截止的岗位；
 - `application_trend` 返回最近 7 天（含当天）；
 - `industry_distribution` 对数据库企业按行业聚合，最多返回 10 个行业；
 - `recent_applications` 最多返回 5 条，并包含岗位名称和企业名称。
 
-种子企业是 Demo 数据，因此 `open_companies` 不能解释为真实开放企业数。
+`open_companies` 是当前本地非 Demo 数据的聚合，不能解释为全网开放企业数；使用时应同时考虑来源和核验日期。
 
 ## 17. curl 示例
 

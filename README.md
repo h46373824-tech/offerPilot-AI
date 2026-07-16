@@ -1,12 +1,14 @@
 # OfferPilot AI
 
+[![CI](https://github.com/h46373824-tech/offerPilot-AI/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/h46373824-tech/offerPilot-AI/actions/workflows/ci.yml)
+
 面向 2027 届校招的求职信息与流程管理平台。OfferPilot AI 将企业与岗位检索、收藏、投递、面试、Offer、校招日历和数据复盘集中到一个工作台中，帮助求职者建立清晰、可追踪的校招流程。
 
-> **数据声明**：仓库内置的 30 家企业和 60 个岗位全部是功能演示数据，均带有 `Demo` / `is_demo` / `demo_unverified` 标记，不代表真实企业、实时招聘状态或有效投递机会。任何求职决策均应以企业官方渠道的最新信息为准。
+> **数据声明**：仓库同时包含 30 家/60 个明确标记的 Demo 企业与岗位，以及 2026-07-16 核验的 14 家企业、23 个正式招聘项目或岗位。访客默认只看到 30 天内核验的正式数据；这不代表全网完整覆盖或之后持续开放，投递前必须再次核对企业官方页面。
 
 ## 当前阶段
 
-本仓库已完成第四阶段本地官方来源同步：管理员可以为企业登记明确允许自动访问的官方招聘页或 RSS/Atom/JSON Feed，按来源定时同步最新岗位，查看运行记录并人工核验。项目仅按本地部署设计，不依赖云服务；不会登录招聘网站、绕过验证码或把自动发现内容直接声明为实时开放。
+本仓库已完成第五阶段公开浏览与 GitHub 发布准备：访客无需登录即可浏览已核验企业和岗位并跳转官方投递页面；登录只用于收藏、投递、简历、提醒和管理功能。首批正式数据具有来源清单与核验日期，仓库加入贡献、安全、Issue、Dependabot 和发布检查文件。项目仍按本地部署设计，不登录招聘网站、不绕过验证码，也不把有限覆盖宣传成“全网实时”。
 
 ## 功能清单
 
@@ -14,7 +16,7 @@
 
 - 登录、注册与 JWT 登录态接入
 - Dashboard：企业与学历统计、今日新增、投递/面试/Offer 数量、即将截止岗位、投递趋势、行业分布、最近投递
-- 企业库与岗位库：关键词搜索、筛选入口和空状态
+- 无需登录的企业库与岗位库：正式来源、核验日期、关键词筛选和官方投递入口
 - 投递管理、校招日历、收藏、Offer 管理、数据分析、设置页面均使用当前用户 API 数据
 - 简历中心：PDF/DOC/DOCX 上传、版本、默认简历、下载、删除及投递关联
 - 岗位订阅：关键词/城市/类别条件、运行频率、启停、手动匹配
@@ -30,7 +32,7 @@
 
 - FastAPI 健康检查和自动生成的 OpenAPI 文档
 - 用户注册、登录、JWT Bearer 认证和当前用户接口
-- 企业与岗位 CRUD，支持分页、搜索、筛选和排序
+- 企业与岗位公共读取及管理员 CRUD，支持分页、搜索、核验筛选和排序
 - 收藏分页、投递/面试/Offer 完整 CRUD、受控状态流转、通知分页与批量已读接口
 - 用户资料与偏好更新、简历文件 API、岗位订阅 CRUD/预览/运行、提醒生成和个人审计日志
 - 管理员专属数据源、导入批次、审核和数据质量 API；普通用户不能修改全局企业/岗位目录
@@ -42,7 +44,8 @@
 ### 数据与工程
 
 - 11 个核心数据表：用户、企业、岗位、投递、收藏、面试、Offer、通知、简历、岗位订阅和审计日志
-- 30 家企业、60 个岗位的明确标记演示种子数据，覆盖互联网、人工智能、通信、半导体、新能源、制造业、银行、央企国企、医药和物流
+- 30 家/60 个明确标记的 Demo 企业与岗位，以及 14 家/23 个截至 2026-07-16 核验的正式发布基线
+- 正式来源审计清单：`database/official-recruitment-2026-07-16.csv`
 - Docker Compose 编排 frontend、backend、PostgreSQL 和 Redis
 - PostgreSQL、Redis 与后端健康检查
 - TypeScript 严格模式、ESLint、Prettier、Ruff、mypy 和 pytest
@@ -192,6 +195,7 @@ python -m pip install --upgrade pip
 pip install -e ".[dev]"
 alembic upgrade head
 python -m app.db.seed
+python -m app.db.seed_official
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -235,7 +239,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 | `CRAWLER_TIMEOUT_SECONDS` | 单次官方请求超时 | `10` |
 | `CRAWLER_MAX_RESPONSE_BYTES` | 单个响应最大字节数 | `2097152` |
 | `CRAWLER_MAX_ITEMS_PER_RUN` | 单来源单次最多处理岗位数 | `100` |
-| `CRAWLER_USER_AGENT` | robots.txt 检查与请求使用的客户端标识 | `OfferPilotAI/0.4 ...` |
+| `CRAWLER_USER_AGENT` | robots.txt 检查与请求使用的客户端标识 | `OfferPilotAI/0.5 ...` |
 
 `.env` 和 `.env.local` 已加入 `.gitignore`。生产环境必须使用密钥管理服务，不得采用模板默认值。
 
@@ -247,7 +251,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 4. 点击“立即同步”验证配置；新发现岗位会出现在岗位库和待核验队列，状态为“待核验”。
 5. 核验后用户可点击“前往官方投递”，新窗口将打开来源提供的官方 URL。
 
-每家企业页面结构和许可不同，因此仓库不会预置或猜测真实企业抓取规则。若 robots.txt 禁止、地址指向内网、需要登录/验证码、响应超限或格式不受支持，本次运行会安全失败并记录原因。当前调度器适用于本地单个 backend 进程；不要把同一数据库连接到多个同时运行的调度实例。
+仓库预置的是人工核验的发布基线和官方跳转链接，不会在启动时访问这些网站。新增自动来源仍需逐个确认页面结构与许可；若 robots.txt 禁止、地址指向内网、需要登录/验证码、响应超限或格式不受支持，本次运行会安全失败并记录原因。当前调度器适用于本地单个 backend 进程。
 
 ## 数据库迁移与种子数据
 
@@ -264,6 +268,7 @@ Docker 环境手动执行：
 ```bash
 docker compose exec backend alembic upgrade head
 docker compose exec backend python -m app.db.seed
+docker compose exec backend python -m app.db.seed_official
 ```
 
 创建新迁移：
@@ -319,7 +324,13 @@ npm run test:e2e -- --project=chromium
 
 ## API 快速体验
 
-注册会返回 Bearer Token：
+企业和岗位公开读取无需注册，例如：
+
+```bash
+curl "http://localhost:8000/api/v1/jobs?is_demo=false&verified_only=true&verified_within_days=30"
+```
+
+使用收藏、投递、简历和提醒等个人功能时，注册会返回 Bearer Token：
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/register \
@@ -337,7 +348,7 @@ Authorization: Bearer <access_token>
 
 ## 数据合规与边界
 
-- 内置企业和岗位只用于 UI、筛选、统计和流程演示，不得宣传为“正在招聘”或“实时开放”。
+- Demo 记录只用于功能演示；正式基线记录必须保留来源、核验日期与官方链接。
 - 平台不实现验证码绕过、反爬规避、登录态盗用或其他违反网站条款的采集能力。
 - 外部数据接入前必须确认授权、来源、许可、用途、保留期限与更新频率。
 - 展示外部招聘信息时必须保存来源、最后核验时间和演示/已核验状态；用户应在投递前访问企业官方渠道复核。
@@ -361,7 +372,7 @@ Authorization: Bearer <access_token>
 
 ### 为什么企业或岗位显示 Demo / 待核验？
 
-这是有意的安全设计。种子数据不代表真实或实时招聘，`deadline` 也仅用于功能演示。请勿依据演示数据直接投递。
+Demo 是功能演示数据；“待核验”表示自动发现或导入后尚未人工确认。只有带核验日期的正式记录进入访客默认列表，且仍应在投递前复核官网。
 
 ### 如何清空本地 Docker 数据重新初始化？
 
@@ -391,6 +402,7 @@ Authorization: Bearer <access_token>
 - [API 参考](docs/API.md)
 - [开发指南](docs/DEVELOPMENT.md)
 - [数据来源与合规](docs/DATA-SOURCES.md)
+- [GitHub 发布清单](docs/RELEASE.md)
 
 ## 许可与责任
 

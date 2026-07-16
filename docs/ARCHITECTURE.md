@@ -60,7 +60,7 @@ frontend/src/
 - **Tailwind CSS** 提供响应式样式和主题样式。
 - `apiFetch` 统一读取 `NEXT_PUBLIC_API_URL`，在浏览器请求中附加 Bearer Token，并把非 2xx 响应转换为可显示错误。
 
-第二阶段核心业务视图已经由 TanStack Query 驱动 API 数据；未登录的企业与岗位页保留明确标记的静态 Demo 降级展示。写操作完成后按资源 query key 失效缓存，并保留加载、空数据、错误和登录要求状态。
+企业库与岗位库由 TanStack Query 直接请求公开读 API，访客无需登录。默认只展示非 Demo、开放且 30 天内核验的数据；网络失败时才使用明确标记的静态 Demo 降级。收藏、投递、简历、提醒与管理操作仍需要认证。
 
 ### 4.2 后端
 
@@ -74,7 +74,8 @@ backend/app/
 │   └── security.py     # 密码哈希与 JWT
 ├── db/
 │   ├── session.py      # Engine、SessionLocal、Base
-│   └── seed.py         # 30/60 Demo 种子
+│   ├── seed.py         # 30/60 Demo 种子
+│   └── seed_official.py # 带核验日期的正式发布基线
 ├── models/             # SQLAlchemy 2 ORM 模型
 ├── schemas/            # 请求与响应 Pydantic 模型
 └── main.py              # FastAPI 应用、中间件、健康检查
@@ -83,7 +84,7 @@ backend/app/
 后端是同步 FastAPI 应用：
 
 1. 路由通过依赖注入获得 SQLAlchemy Session；
-2. 需要认证的路由解析 OAuth2 Bearer Token；
+2. 企业和岗位读取公开，个人及管理路由解析 OAuth2 Bearer Token；
 3. Pydantic 在业务函数运行前验证输入；
 4. SQLAlchemy ORM 执行查询和事务；
 5. response model 过滤并序列化输出；
