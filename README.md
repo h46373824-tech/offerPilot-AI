@@ -1,6 +1,8 @@
 # OfferPilot AI
 
 [![CI](https://github.com/h46373824-tech/offerPilot-AI/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/h46373824-tech/offerPilot-AI/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/h46373824-tech/offerPilot-AI)](https://github.com/h46373824-tech/offerPilot-AI/releases/latest)
+[![License](https://img.shields.io/github/license/h46373824-tech/offerPilot-AI)](LICENSE)
 
 面向 2027 届校招的求职信息与流程管理平台。OfferPilot AI 将企业与岗位检索、收藏、投递、面试、Offer、校招日历和数据复盘集中到一个工作台中，帮助求职者建立清晰、可追踪的校招流程。
 
@@ -8,7 +10,9 @@
 
 ## 当前阶段
 
-本仓库已完成第五阶段公开浏览与 GitHub 发布准备：访客无需登录即可浏览已核验企业和岗位并跳转官方投递页面；登录只用于收藏、投递、简历、提醒和管理功能。首批正式数据具有来源清单与核验日期，仓库加入贡献、安全、Issue、Dependabot 和发布检查文件。项目仍按本地部署设计，不登录招聘网站、不绕过验证码，也不把有限覆盖宣传成“全网实时”。
+当前稳定版本为 **v1.0.1**。访客无需登录即可浏览已核验企业和岗位并跳转官方投递页面；登录只用于收藏、投递、简历、提醒和管理功能。首批正式数据具有来源清单与核验日期，仓库已配置贡献、安全、Issue、Dependabot、CodeQL 和发布检查。项目仍按本地部署设计，不登录招聘网站、不绕过验证码，也不把有限覆盖宣传成“全网实时”。
+
+版本变更请查看 [CHANGELOG.md](CHANGELOG.md)，本次发布说明位于 [docs/releases/v1.0.1.md](docs/releases/v1.0.1.md)。
 
 ## 功能清单
 

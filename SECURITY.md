@@ -2,7 +2,12 @@
 
 ## Supported version
 
-Only the latest commit on `dev` is actively maintained before the first stable release. After a tagged release, supported versions will be listed here.
+| Version | Supported |
+| --- | --- |
+| 1.0.1 | Yes |
+| Earlier versions | No |
+
+Security fixes are prepared on `dev` and included in the next tagged release. Users should run the latest stable version whenever possible.
 
 ## Reporting a vulnerability
 

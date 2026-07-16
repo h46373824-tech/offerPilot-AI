@@ -48,7 +48,7 @@ app = FastAPI(
         "企业和岗位读取可公开访问，个人与管理操作需要认证。"
         "Demo 数据不代表实时招聘状态，正式数据应结合核验日期使用。"
     ),
-    version="0.5.0",
+    version="1.0.1",
     openapi_url="/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
