@@ -6,4 +6,4 @@
 - 回滚：`cd backend && alembic downgrade -1`
 - Demo 数据：`cd backend && python -m app.db.seed`
 
-种子脚本只写入明确标记为 `is_demo=true`、`demo_unverified` 的 30 家企业和 60 个岗位。
+种子脚本只写入明确标记为 `is_demo=true`、`demo_only` 的 30 家企业和 60 个岗位。
